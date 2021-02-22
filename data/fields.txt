@@ -1,0 +1,140 @@
+1_Portfolio identifying data
+2_Type of identification code for the fund share or portfolio
+3_Portfolio name
+4_Portfolio currency (B)
+5_Net asset valuation of the portfolio or the share class in portfolio currency
+6_Valuation date
+7_Reporting date
+8_Share price
+8b_Total number of shares
+9_% cash
+10_Portfolio Modified Duration
+11_Complete SCR Delivery
+12_CIC code of the instrument
+13_Economic zone of the quotation place
+14_Identification code of the financial instrument
+15_Type of identification code for the instrument
+16_Grouping code for multiple leg instruments
+17_Instrument name
+18_Quantity
+19_Nominal amount
+20_Contract size for derivatives
+21_Quotation currency (A)
+22_Market valuation in quotation currency (A)
+23_Clean market valuation in quotation currency (A)
+24_Market valuation in portfolio currency (B)
+25_Clean market valuation in portfolio currency (B)
+26_Valuation weight
+27_Market exposure amount in quotation currency (A)
+28_Market exposure amount in portfolio currency (B)
+29_Market exposure amount for the 3rd currency in quotation currency of the underlying asset (C)
+30_Market Exposure in weight
+31_Market exposure for the 3rd currency in weight over NAV
+32_Interest rate type
+33_Coupon rate
+34_Interest rate reference identification
+35_Identification type for interest rate index
+36_Interest rate index name
+37_Interest rate Margin
+38_Coupon payment frequency
+39_Maturity date
+40_Redemption type
+41_Redemption rate
+42_Callable / putable
+43_Call / put date
+44_Issuer / bearer option exercise
+45_Strike price for embedded (call/put) options
+46_Issuer name
+47_Issuer identification code
+48_Type of identification code for issuer
+49_Name of the group of the issuer
+50_Identification of the group
+51_Type of identification code for issuer group
+52_Issuer country
+53_Issuer economic area
+54_Economic sector
+55_Covered / not covered
+56_Securitisation
+57_Explicit guarantee by the country of issue
+58_Subordinated debt
+58b_Nature of the TRANCHE
+59_Credit quality step
+60_Call / Put / Cap / Floor
+61_Strike price
+62_Conversion factor (convertibles) / concordance factor / parity (options)
+63_Effective Date of Instrument
+64_Exercise type
+65_Hedging Rolling
+67_CIC code of the underlying asset
+68_Identification code of the underlying asset
+69_Type of identification code for the underlying asset
+70_Name of the underlying asset
+71_Quotation currency of the underlying asset (C)
+72_Last valuation price of the underlying asset
+73_Country of quotation of the underlying asset
+74_Economic Area of quotation of the underlying asset
+75_Coupon rate of the underlying asset
+76_Coupon payment frequency of the underlying asset
+77_Maturity date of the underlying asset
+78_Redemption profile of the underlying asset
+79_Redemption rate of the underlying asset
+80_Issuer name of the underlying asset
+81_Issuer identification code of the underlying asset
+82_Type of issuer identification code of the underlying asset
+83_Name of the group of the issuer of the underlying asset
+84_Identification of the group of the underlying asset
+85_Type of the group identification code of the underlying asset
+86_Issuer country of the underlying asset
+87_Issuer economic area of the underlying asset
+88_Explicit guarantee by the country of issue of the underlying asset
+89_Credit quality step of the underlying asset
+90_Modified Duration to maturity date
+91_Modified duration to next option exercise date
+92_Credit sensitivity
+93_Sensitivity to underlying asset price (delta)
+94_Convexity / gamma for derivatives
+94b_Vega
+95_Identification of the original portfolio for positions embedded in a fund
+97_SCR_Mrkt_IR_up weight over NAV
+98_SCR_Mrkt_IR_down weight over NAV
+99_SCR_Mrkt_Eq_type1 weight over NAV
+100_SCR_Mrkt_Eq_type2 weight over NAV
+101_SCR_Mrkt_Prop weight over NAV
+102_SCR_Mrkt_Spread_bonds weight over NAV
+103_SCR_Mrkt_Spread_structured weight over NAV
+104_SCR_Mrkt_Spread_derivatives_up weight over NAV
+105_SCR_Mrkt_Spread_derivatives_down weight over NAV
+105a_SCR_Mrkt_FX_up weight over NAV
+105b_SCR_Mrkt_FX_down weight over NAV
+106_Asset pledged as collateral
+107_Place of deposit
+108_Participation
+110_Valorisation method
+111_Value of acquisition
+112_Credit rating
+113_Rating agency
+114_Issuer economic area
+115_Fund Issuer Code
+116_Fund Issuer Code Type
+117_Fund Issuer Name
+118_Fund Issuer Sector
+119_Fund Issuer Group Code
+120_Fund Issuer Group Code Type
+121_Fund Issuer Group name
+122_Fund Issuer Country
+123_Fund CIC code
+123a_Fund Custodian Country
+124_Duration
+125_Accrued Income (Security Denominated Currency)
+126_Accrued Income (Portfolio Denominated Currency)
+127_Bond Floor (convertible instrument only)
+128_Option premium (convertible instrument only)
+129_Valuation Yield
+130_Valuation Z-spread
+131_Underlying Asset Category
+132_Infrastructure_investment
+133_custodian_name
+134_type1_private_equity_portfolio_eligibility
+135_type1_private_equity_issuer_beta
+137_counterparty_sector
+1000_TPT Version
