@@ -7,9 +7,9 @@ import openpyxl
 from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.styles import Alignment
 
-from db_fetcher import TPT_Fetcher
-from cash_flow import Cash_Flow
-from scr_module import SCR_Module
+from .db_fetcher import TPT_Fetcher
+from .cash_flow import Cash_Flow
+from .scr_module import SCR_Module
 
 class TPT_Generator():
     """
@@ -51,7 +51,7 @@ class TPT_Generator():
         self.TPT_report = pd.DataFrame(index=range(Ncol), columns=self.fields.values(), dtype=object)
     
     def output_excel(self):
-        root_path = Path('C:/Users/Hugo Durand/Workspace/data')
+        root_path = Path('./data')
         template_file_name = 'AO_TPT_V5.0_Template.xlsx'
         output_file_name = f"AO_TPT_V5.0_{self.client}_{self.shareclass_isin}_{self.date}.xlsx"
         template = openpyxl.load_workbook(root_path / template_file_name)

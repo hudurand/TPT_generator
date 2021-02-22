@@ -59,7 +59,7 @@ def reference_TPT_report(params_fixt):
     load the reference TPT report
     """ 
 
-    root_path = Path("C:/Users/Hugo Durand/Workspace/data/BIL MI 20201231/Final reports")
+    root_path = Path("../data/reference_reports")
     file_name = params_fixt[3]
 
  

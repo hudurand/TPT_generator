@@ -112,7 +112,7 @@ class Cash_Flow():
         return CF
 
     def load_rates(self):       
-        root_path = Path('C:/Users/Hugo Durand/Workspace/data')
+        root_path = Path('./data')
         CF_file_name = f"Template Cash flows TPT_{self.date}.xlsm"
         RFR_feather = f"RFR_{self.date}.feather"
         UP_feather = f"UP_{self.date}.feather"

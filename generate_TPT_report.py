@@ -1,7 +1,7 @@
 import fire
 import pandas as pd
 import pyodbc
-from TPT_generator import TPT_Generator
+from TPT_generator_python import TPT_Generator
 from timeit import default_timer as timer
 
 def generate_TPT_report(client, 

@@ -35,17 +35,13 @@ class TPT_Fetcher():
         self.instruments = None
         self.instruments_infos = None
         self.bloomberg_infos = None
-        #self.TPT_base = None
         self.portfolio_NAVs= None
 
     def open_portfolio(self):
         portfolio_file_name = "AO_Portfolio Valuation BIL Invest_20201231.xlsx"
-        root_data_path = Path('C:/Users/Hugo Durand/Workspace/data/BIL MI 20201231/Source data')
+        root_data_path = Path('./data')
         portfolio_file_path = root_data_path / portfolio_file_name
-        #self.TPT_base = pd.read_excel(portfolio_file_path,
-        #                              sheet_name="SDPOR06I")
         self.portfolio_NAVs = pd.read_excel(portfolio_file_path, sheet_name="NAV")
-        #print(self.portfolio_NAVs.info)
 
     def fetch(self):
         self.fetch_shareclass_infos()
@@ -229,7 +225,7 @@ class TPT_Fetcher():
         #######################################################################
         AODB_file_name = "AO Data Base v0.8.xlsx"
         BBG_file_name = "AO_Bloomberg_Template_SII.xlsx"
-        root_data_path = Path('C:/Users/Hugo Durand/Workspace/data')
+        root_data_path = Path('./data')
         AODB_file_path = root_data_path / AODB_file_name
         BBG_file_path = root_data_path / BBG_file_name
         
