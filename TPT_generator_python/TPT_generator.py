@@ -20,23 +20,30 @@ class TPT_Generator():
     def __init__(self,
                  date,
                  client=None,
-                 shareclass_isin=None):
+                 shareclass_isin=None,
+                 source_dir=None,
+                 output_dir=None,
+                 sym_adj=0):
         """
         intialise report-specific attributes and fetcher
         """
-
-        self.shareclass_isin = shareclass_isin
-        self.client = client
         self.date = date
-        self.sym_adj = -0.48
-        self.fetcher = TPT_Fetcher(self.date,
-                                   self.client,
-                                   self.shareclass_isin)
+        self.client = client
+        self.shareclass_isin = shareclass_isin
+        self.source_dir = Path(source_dir)
+        self.output_dir = Path(output_dir)
+
+        self.sym_adj = sym_adj
         self.define_fields()
         self.define_IN18()
-        self.create_empty_report()
-        self.cash_flows = Cash_Flow(pd.to_datetime(self.date).strftime('%Y%m%d'))
+        self.cash_flows = Cash_Flow(self.date.strftime('%Y%m%d'))
         self.scr_module = SCR_Module()
+
+        self.fetcher = TPT_Fetcher(self.date,
+                                   self.client,
+                                   self.shareclass_isin,
+                                   self.source_dir)
+        self.create_empty_report()
         self.INTER = None
 
     def generate(self):
@@ -51,10 +58,10 @@ class TPT_Generator():
         self.TPT_report = pd.DataFrame(index=range(Ncol), columns=self.fields.values(), dtype=object)
     
     def output_excel(self):
-        root_path = Path('./data')
+        #root_path = Path('./data')
         template_file_name = 'AO_TPT_V5.0_Template.xlsx'
         output_file_name = f"AO_TPT_V5.0_{self.client}_{self.shareclass_isin}_{self.date}.xlsx"
-        template = openpyxl.load_workbook(root_path / template_file_name)
+        template = openpyxl.load_workbook(self.source_dir / template_file_name)
         report = template.get_sheet_by_name('Report')
         rows = dataframe_to_rows(self.TPT_report, index=False)
 
@@ -80,7 +87,7 @@ class TPT_Generator():
                         report.cell(row=row_idx+1, column=column_map[col_idx], value=value)
                         report.cell(row=row_idx+1, column=column_map[col_idx]).alignment = Alignment(horizontal='center')
 
-        template.save(root_path / output_file_name)
+        template.save(self.output_dir / output_file_name)
 
     def compute_intermediate_calc(self):
         self.INTER = self.fetcher.get_instruments().loc[:,["quantity_nominal",
@@ -146,7 +153,7 @@ class TPT_Generator():
 
     def fill_column_7(self):
         self.TPT_report.loc[:,self.fields["7"]] = \
-            self.date
+            self.date.strftime('%Y-%m-%d')
 
     def fill_column_8(self):
         self.TPT_report.loc[:,self.fields["8"]] = \
@@ -322,7 +329,7 @@ class TPT_Generator():
         
         SC_indicator = self.fetcher.get_shareclass_infos()["shareclass"].iloc[0]
         SC_NAV = self.fetcher.get_shareclass_nav()["shareclass_total_net_asset_sf_curr"].iloc[0]
-        Hedged_SC = self.fetcher.get_shareclass_nav()["Hedged"].iloc[0]
+        Hedged_SC = self.fetcher.get_shareclass_nav("Hedged")
         SC_instruments_index = self.fetcher.get_instruments().loc[
             self.fetcher.get_instruments()["hedge_indicator"] == SC_indicator].index
         F_instruments_index = self.fetcher.get_instruments().loc[
@@ -607,15 +614,6 @@ class TPT_Generator():
         self.fill_instrument_info(self.fields["94b"])
 
     def fill_column_97(self):
-        self.check_required(["7", "12", "14", "21", "26", "33", "38", "39", "43", "45"])
-
-        self.TPT_report.set_index([self.fields["14"]], inplace=True)
-
-        if not self.cash_flows.actualized:
-            self.cash_flows.compute(self.TPT_report.join(self.get_calc("quantity_nominal")))
-        
-        column_97 = pd.DataFrame(index=self.TPT_report.index, columns=["col"])
-        
         def compute_97(row):
             if self.TPT_report.loc[row.name, self.fields["12"]][2] in ["1", "2", "5"]:
                 if self.cash_flows[row.name]["rfr"].sum() == 0:
@@ -626,6 +624,15 @@ class TPT_Generator():
                                * self.TPT_report.loc[row.name, self.fields["26"]]
             return 0
 
+        self.check_required(["7", "12", "14", "21", "26", "33", "38", "39", "43", "45"])
+
+        self.TPT_report.set_index([self.fields["14"]], inplace=True)
+
+        if not self.cash_flows.actualized:
+            self.cash_flows.compute(self.TPT_report.join(self.get_calc("quantity_nominal")))
+        
+        column_97 = pd.DataFrame(index=self.TPT_report.index, columns=["col"])
+        
         column_97 = column_97.apply(lambda row: compute_97(row), axis=1)
                                     
         self.TPT_report[self.fields["97"]].update(column_97)

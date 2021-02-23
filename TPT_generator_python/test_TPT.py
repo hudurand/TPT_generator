@@ -4,46 +4,61 @@ import numpy as np
 from pathlib import Path
 from pandas.testing import assert_series_equal, assert_index_equal
 
-from db_fetcher import TPT_Fetcher
-from TPT_generator import TPT_Generator
+from TPT_generator_python import TPT_Fetcher
+from TPT_generator_python import TPT_Generator
 
 @pytest.fixture(scope="module",
     params=[
         pytest.param(("BIL", "LU1689732417", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Bonds USD Corporate Investment Grade - P USD CAP_LU1689732417_20201231.xlsx"), id="LU1689732417"),
-        pytest.param(("BIL", "LU1689729546", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Absolute Return - I EUR CAP_LU1689729546_20201231.xlsx"), id="LU1689729546"),
-        pytest.param(("BIL", "LU1689729629", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Absolute Return - P EUR CAP_LU1689729629_20201231.xlsx"), id="LU1689729629"),
-        pytest.param(("BIL", "LU1808854803", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Bonds Emerging Markets - I EUR Hedged CAP_LU1808854803_20201231.xlsx"), id="LU1808854803"),
-        pytest.param(("BIL", "LU1689730122", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Bonds Emerging Markets - I USD CAP_LU1689730122_20201231.xlsx"), id="LU1689730122"),
-        pytest.param(("BIL", "LU1689730718", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Bonds EUR Corporate Investment Grade - I EUR CAP_LU1689730718_20201231.xlsx"), id="LU1689730718"),
-        pytest.param(("BIL", "LU1689730809", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Bonds EUR Corporate Investment Grade - P EUR CAP_LU1689730809_20201231.xlsx"), id="LU1689730809"),
+        #pytest.param(("BIL", "LU1689729546", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Absolute Return - I EUR CAP_LU1689729546_20201231.xlsx"), id="LU1689729546"),
+        #pytest.param(("BIL", "LU1689729629", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Absolute Return - P EUR CAP_LU1689729629_20201231.xlsx"), id="LU1689729629"),
+        #pytest.param(("BIL", "LU1808854803", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Bonds Emerging Markets - I EUR Hedged CAP_LU1808854803_20201231.xlsx"), id="LU1808854803"),
+        #pytest.param(("BIL", "LU1689730122", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Bonds Emerging Markets - I USD CAP_LU1689730122_20201231.xlsx"), id="LU1689730122"),
+        #pytest.param(("BIL", "LU1689730718", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Bonds EUR Corporate Investment Grade - I EUR CAP_LU1689730718_20201231.xlsx"), id="LU1689730718"),
+        #pytest.param(("BIL", "LU1689730809", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Bonds EUR Corporate Investment Grade - P EUR CAP_LU1689730809_20201231.xlsx"), id="LU1689730809"),
         #pytest.param(("BIL", "LU1689731286", "2020-12-30", "AO_TPT_V5.0_BIL Invest - Bonds EUR High Yield - I EUR CAP_LU1689731286_20201231.xlsx"), id="LU1689731286"),
         #pytest.param(("BIL", "LU1689731872", "2020-12-30", "AO_TPT_V5.0_BIL Invest - Bonds EUR Sovereign - I EUR CAP_LU1689731872_20201231.xlsx"), id="LU1689731872"),
         #pytest.param(("BIL", "LU1689731955", "2020-12-30", "AO_TPT_V5.0_BIL Invest - Bonds EUR Sovereign - P EUR CAP_LU1689731955_20201231.xlsx"), id="LU1689731955"),
-        pytest.param(("BIL", "LU1565452015", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Bonds Renta Fund - P EUR CAP_LU1565452015_20201231.xlsx"), id="LU1565452015"),
-        pytest.param(("BIL", "LU1808854985", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Bonds USD Corporate Investment Grade - I EUR Hedged CAP_LU1808854985_20201231.xlsx"), id="LU1808854985"),
-        pytest.param(("BIL", "LU1689732334", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Bonds USD Corporate Investment Grade - I USD CAP_LU1689732334_20201231.xlsx"), id="LU1689732334"),
-        pytest.param(("BIL", "LU1808855016", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Bonds USD High Yield - I EUR Hedged CAP_LU1808855016_20201231.xlsx"), id="LU1808855016"),
+        #pytest.param(("BIL", "LU1565452015", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Bonds Renta Fund - P EUR CAP_LU1565452015_20201231.xlsx"), id="LU1565452015"),
+        #pytest.param(("BIL", "LU1808854985", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Bonds USD Corporate Investment Grade - I EUR Hedged CAP_LU1808854985_20201231.xlsx"), id="LU1808854985"),
+        #pytest.param(("BIL", "LU1689732334", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Bonds USD Corporate Investment Grade - I USD CAP_LU1689732334_20201231.xlsx"), id="LU1689732334"),
+        #pytest.param(("BIL", "LU1808855016", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Bonds USD High Yield - I EUR Hedged CAP_LU1808855016_20201231.xlsx"), id="LU1808855016"),
         #pytest.param(("BIL", "LU1689733498", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Bonds USD Sovereign - I USD CAP_LU1689733498_20201231.xlsx"), id="LU1689733498"),
         #pytest.param(("BIL", "LU1917566066", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Bonds USD Sovereign - P EUR Hedged Cap_LU1917566066_20201231.xlsx"), id="LU1917566066"),
-        pytest.param(("BIL", "LU1689734462", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Equities Emerging Markets - I USD CAP_LU1689734462_20201231.xlsx"), id="LU1689734462"),
-        pytest.param(("BIL", "LU1689734546", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Equities Emerging Markets - P USD CAP_LU1689734546_20201231.xlsx"), id="LU1689734546"),
-        pytest.param(("BIL", "LU1689735196", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Equities Europe - I EUR CAP_LU1689735196_20201231.xlsx"), id="LU1689735196"),
-        pytest.param(("BIL", "LU1689735279", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Equities Europe - P EUR CAP_LU1689735279_20201231.xlsx"), id="LU1689735279"),
-        pytest.param(("BIL", "LU1689733902", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Equities Japan - I JPY CAP_LU1689733902_20201231.xlsx"), id="LU1689733902"),
-        pytest.param(("BIL", "LU1689734033", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Equities Japan - P JPY CAP_LU1689734033_20201231.xlsx"), id="LU1689734033"),
-        pytest.param(("BIL", "LU1689735600", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Equities US - I USD CAP_LU1689735600_20201231.xlsx"), id="LU1689735600"),
-        pytest.param(("BIL", "LU1689735782", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Equities US - P USD CAP_LU1689735782_20201231.xlsx"), id="LU1689735782"),
-        pytest.param(("BIL", "LU0509288378", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Patrimonial Defensive - P EUR CAP_LU0509288378_20201231.xlsx"), id="LU0509288378"),
-        pytest.param(("BIL", "LU0049912065", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Patrimonial High - P EUR CAP_LU0049912065_20201231.xlsx"), id="LU0049912065"),
-        pytest.param(("BIL", "LU0548495596", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Patrimonial Low - I EUR CAP_LU0548495596_20201231.xlsx"), id="LU0548495596"),
-        pytest.param(("BIL", "LU0049911091", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Patrimonial Low - P EUR CAP_LU0049911091_20201231.xlsx"), id="LU0049911091"),
-        pytest.param(("BIL", "LU0049910796", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Patrimonial Low - P EUR DIS_LU0049910796_20201231.xlsx"), id="LU0049910796"),
-        pytest.param(("BIL", "LU1033871838", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Patrimonial Low - P USD Hedged CAP_LU1033871838_20201231.xlsx"), id="LU1033871838"),
-        pytest.param(("BIL", "LU0108482372", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Patrimonial Medium - P EUR CAP_LU0108482372_20201231.xlsx"), id="LU0108482372"),
-        pytest.param(("BIL", "LU1440060207", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Patrimonial Medium - P USD Hedged CAP_LU1440060207_20201231.xlsx"), id="LU1440060207"),
+        #pytest.param(("BIL", "LU1689734462", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Equities Emerging Markets - I USD CAP_LU1689734462_20201231.xlsx"), id="LU1689734462"),
+        #pytest.param(("BIL", "LU1689734546", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Equities Emerging Markets - P USD CAP_LU1689734546_20201231.xlsx"), id="LU1689734546"),
+        #pytest.param(("BIL", "LU1689735196", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Equities Europe - I EUR CAP_LU1689735196_20201231.xlsx"), id="LU1689735196"),
+        #pytest.param(("BIL", "LU1689735279", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Equities Europe - P EUR CAP_LU1689735279_20201231.xlsx"), id="LU1689735279"),
+        #pytest.param(("BIL", "LU1689733902", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Equities Japan - I JPY CAP_LU1689733902_20201231.xlsx"), id="LU1689733902"),
+        #pytest.param(("BIL", "LU1689734033", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Equities Japan - P JPY CAP_LU1689734033_20201231.xlsx"), id="LU1689734033"),
+        #pytest.param(("BIL", "LU1689735600", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Equities US - I USD CAP_LU1689735600_20201231.xlsx"), id="LU1689735600"),
+        #pytest.param(("BIL", "LU1689735782", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Equities US - P USD CAP_LU1689735782_20201231.xlsx"), id="LU1689735782"),
+        #pytest.param(("BIL", "LU0509288378", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Patrimonial Defensive - P EUR CAP_LU0509288378_20201231.xlsx"), id="LU0509288378"),
+        #pytest.param(("BIL", "LU0049912065", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Patrimonial High - P EUR CAP_LU0049912065_20201231.xlsx"), id="LU0049912065"),
+        #pytest.param(("BIL", "LU0548495596", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Patrimonial Low - I EUR CAP_LU0548495596_20201231.xlsx"), id="LU0548495596"),
+        #pytest.param(("BIL", "LU0049911091", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Patrimonial Low - P EUR CAP_LU0049911091_20201231.xlsx"), id="LU0049911091"),
+        #pytest.param(("BIL", "LU0049910796", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Patrimonial Low - P EUR DIS_LU0049910796_20201231.xlsx"), id="LU0049910796"),
+        #pytest.param(("BIL", "LU1033871838", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Patrimonial Low - P USD Hedged CAP_LU1033871838_20201231.xlsx"), id="LU1033871838"),
+        #pytest.param(("BIL", "LU0108482372", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Patrimonial Medium - P EUR CAP_LU0108482372_20201231.xlsx"), id="LU0108482372"),
+        #pytest.param(("BIL", "LU1440060207", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Patrimonial Medium - P USD Hedged CAP_LU1440060207_20201231.xlsx"), id="LU1440060207"),
         #pytest.param(("BIL", "LU0698523601", "2020-12-31", "AO_TPT_V5.0_Private One - Capital Balanced Fund - B EUR_LU0698523601_20201231.xlsx"), id="LU0698523601"),
         #pytest.param(("BIL", "LU2073848363", "2020-12-31", "AO_TPT_V5.0_Private One - Saint-Saens - EUR CAP_LU2073848363_20201231.xlsx"), id="LU2073848363"),
+        pytest.param(("Dynasty", "LU2133138276", "2020-12-31", "AO_TPT_V5.0_Dynasty Corporate Bonds 0 - 2.5 Class A_LU2133138276_20201231.xlsx"), id="LU2133138276"),
+        #pytest.param(("Dynasty", "LU2133138433", "2020-12-31", "AO_TPT_V5.0_Dynasty Corporate Bonds 0 - 2.5 Class B_LU2133138433_20201231.xlsx"), id="LU2133138433"),
+        #pytest.param(("Dynasty", "LU1280365476", "2020-12-31", "AO_TPT_V5.0_Dynasty Global Convertibles A CHF_LU1280365476_20201231.xlsx"), id="LU1280365476"),
+        #pytest.param(("Dynasty", "LU1280365393", "2020-12-31", "AO_TPT_V5.0_Dynasty Global Convertibles A EUR_LU1280365393_20201231.xlsx"), id="LU1280365393"),
+        #pytest.param(("Dynasty", "LU1280365559", "2020-12-31", "AO_TPT_V5.0_Dynasty Global Convertibles A USD_LU1280365559_20201231.xlsx"), id="LU1280365559"),
+        #pytest.param(("Dynasty", "LU1483663818", "2020-12-31", "AO_TPT_V5.0_Dynasty Global Convertibles B CHF_LU1483663818_20201231.xlsx"), id="LU1483663818"),
+        #pytest.param(("Dynasty", "LU1280365633", "2020-12-31", "AO_TPT_V5.0_Dynasty Global Convertibles B EUR_LU1280365633_20201231.xlsx"), id="LU1280365633"),
+        #pytest.param(("Dynasty", "LU1840818220", "2020-12-31", "AO_TPT_V5.0_Dynasty Global Convertibles B GBP_LU1840818220_20201231.xlsx"), id="LU1840818220"),
+        #pytest.param(("Dynasty", "LU1586705938", "2020-12-31", "AO_TPT_V5.0_Dynasty Global Convertibles B USD_LU1586705938_20201231.xlsx"), id="LU1586705938"),
+        #pytest.param(("Dynasty", "LU1508332993", "2020-12-31", "AO_TPT_V5.0_Dynasty Global Convertibles D EUR_LU1508332993_20201231.xlsx"), id="LU1508332993"),
+        #pytest.param(("Dynasty", "LU1073011352", "2020-12-31", "AO_TPT_V5.0_Dynasty High Yield 2026 A EUR_LU1073011352_20201231.xlsx"), id="LU1073011352"),
+        #pytest.param(("Dynasty", "LU1586707801", "2020-12-31", "AO_TPT_V5.0_Dynasty High Yield 2026 A USD_LU1586707801_20201231.xlsx"), id="LU1586707801"),
+        #pytest.param(("Dynasty", "LU1073013564", "2020-12-31", "AO_TPT_V5.0_Dynasty High Yield 2026 B EUR_LU1073013564_20201231.xlsx"), id="LU1073013564"),
+        #pytest.param(("Dynasty", "LU1280365120", "2020-12-31", "AO_TPT_V5.0_Dynasty High Yield 2026 D EUR_LU1280365120_20201231.xlsx"), id="LU1280365120"),
         ])
+
 
 def params_fixt(request):
     CLIENT = request.param[0]
@@ -59,7 +74,7 @@ def reference_TPT_report(params_fixt):
     load the reference TPT report
     """ 
 
-    root_path = Path("../data/reference_reports")
+    root_path = Path("./data/reference_reports")
     file_name = params_fixt[3]
 
  
@@ -114,8 +129,8 @@ def fetcher(params_fixt):
     """
 
     CLIENT, ISIN, DATE, _ = params_fixt
-
-    f = TPT_Fetcher(DATE, CLIENT, ISIN)
+    SOURCE_DIR = Path('./data')
+    f = TPT_Fetcher(DATE, CLIENT, ISIN, SOURCE_DIR)
     f.fetch()
 
     return f
@@ -127,10 +142,14 @@ def generator(params_fixt):
     """
 
     CLIENT, ISIN, DATE, _ = params_fixt
-
+    SOURCE_DIR = Path('./data')
+    OUTPUT_DIR = Path('./TEST_DIR')
+    DATE = pd.to_datetime(DATE).date()
     g = TPT_Generator(DATE,
                       CLIENT,
-                      ISIN)
+                      ISIN,
+                      SOURCE_DIR,
+                      OUTPUT_DIR)
     
     return g
 
@@ -1385,8 +1404,8 @@ def test_fill_column_99(generator, reference_TPT_report):
     prod = generator.TPT_report.set_index("14_Identification code of the financial instrument").sort_index()
     ref = reference_TPT_report.set_index("14_Identification code of the financial instrument").sort_index()
 
-    column = pd.to_numeric(prod["99_SCR_Mrkt_Eq_type1 weight over NAV"]) #.round(5)
-    ref_col = pd.to_numeric(ref["99_SCR_Mrkt_Eq_type1 weight over NAV"]) #.round(5)
+    column = pd.to_numeric(prod["99_SCR_Mrkt_Eq_type1 weight over NAV"]).round(5)
+    ref_col = pd.to_numeric(ref["99_SCR_Mrkt_Eq_type1 weight over NAV"]).round(5)
 
     diff1 = column.loc[column != ref_col]
     print(diff1)
