@@ -1,0 +1,12 @@
+date: '2020-12-31'
+symmetric_adjustment: -0.48
+source_dir: './data'
+clients: 
+    Dynasty:
+        shareclasses: 
+            - "LU2133138276"
+        output_dir: './production/Dynasty'
+#    Dynasty:
+#        shareclasses: 
+#            - ''
+#        output_dir: './production/Dynasty'

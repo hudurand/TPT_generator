@@ -1,2 +1,3 @@
 logs/*
 TPT_generator_python/__pycache__/*
+production/*
