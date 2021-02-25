@@ -360,7 +360,7 @@ class TPT_Fetcher():
             self.instruments_infos["12_CIC code of the instrument"].apply(
                 lambda x: map_CQS(x, self.client, self.AODB_CASH))
         self.instruments_infos["61_Strike price"].where(~self.get_instruments("contract_number").notnull(),
-                                                        self.get_instruments("contract_number").apply(lambda x: compute_strike_price(self.get_instruments, x)),
+                                                        self.get_instruments("contract_number").apply(lambda x: compute_strike_price(self.get_instruments(), x)),
                                                         inplace=True)
 
         self.instruments_infos.reset_index(inplace=True)
