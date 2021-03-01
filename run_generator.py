@@ -24,11 +24,11 @@ if __name__ == "__main__":
                       SOURCE_DIR,
                       OUTPUT_DIR)
 
-    g.fill_column_19()
+    #g.fill_column_19()
     #print(g.cash_flows)
     #{g.create_empty_report()
-    #g.generate()
+    g.generate()
     #g.output_excel()
-    print(g.TPT_report[g.fields["19"]])
+    #print(g.TPT_report[g.fields["19"]])
     end = timer()
     print(end - start)

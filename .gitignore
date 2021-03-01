@@ -1,7 +1,6 @@
 logs/*
 TPT_generator_python/__pycache__/*
-#production/*
+production/*
 data/NAV compared to last yearend closing  and Asset & liabilities statment.pdf
 data/AO_mapping Pictet portfolio_v0.2.docx
 stash/*
-TPT_generator_python/data_bucket.py

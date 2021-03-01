@@ -10,6 +10,7 @@ from openpyxl.styles import Alignment
 from .db_fetcher import TPT_Fetcher
 from .cash_flow import Cash_Flow
 from .scr_module import SCR_Module
+from .data_bucket import Data_Bucket
 
 class TPT_Generator():
     """
@@ -43,6 +44,8 @@ class TPT_Generator():
                                    self.client,
                                    self.shareclass_isin,
                                    self.source_dir)
+        self.data_bucket = Data_Bucket(self.fetcher)
+        
         self.create_empty_report()
         self.INTER = None
 
@@ -55,7 +58,7 @@ class TPT_Generator():
         """
         create an empty TPT report to fill
         """
-        Ncol = len(self.fetcher.get_instruments().index)
+        Ncol = len(self.data_bucket.get_instruments().index)
         self.TPT_report = pd.DataFrame(index=range(Ncol), columns=self.fields.values(), dtype=object)
     
     def output_excel(self):
@@ -141,23 +144,23 @@ class TPT_Generator():
     
     def fill_column_2(self):
         self.TPT_report.loc[:,self.fields["2"]] = \
-            self.fetcher.get_shareclass_infos()["type_tpt"].astype('int64').iloc[0]
+            int(self.data_bucket.get_shareclass_infos("type_tpt"))
 
     def fill_column_3(self):
         self.TPT_report.loc[:,self.fields["3"]] = \
-            self.fetcher.get_shareclass_infos()["shareclass_name"].iloc[0]
+            self.data_bucket.get_shareclass_infos("shareclass_name")
     
     def fill_column_4(self):
         self.TPT_report.loc[:,self.fields["4"]] = \
-            self.fetcher.get_shareclass_infos()["shareclass_currency"].iloc[0]
+            self.data_bucket.get_shareclass_infos("shareclass_currency")
 
     def fill_column_5(self):
         self.TPT_report.loc[:,self.fields["5"]] = \
-            self.fetcher.get_shareclass_nav()["shareclass_total_net_asset_sc_curr"].iloc[0]
+            self.data_bucket.get_shareclass_nav("shareclass_total_net_asset_sc_curr")
 
     def fill_column_6(self):
         self.TPT_report.loc[:,self.fields["6"]] = \
-            self.fetcher.get_shareclass_nav()["nav_date"].iloc[0]
+            self.data_bucket.get_shareclass_nav("nav_date")
 
     def fill_column_7(self):
         self.TPT_report.loc[:,self.fields["7"]] = \
@@ -165,11 +168,11 @@ class TPT_Generator():
 
     def fill_column_8(self):
         self.TPT_report.loc[:,self.fields["8"]] = \
-            self.fetcher.get_shareclass_nav()["share_price"].iloc[0]
+            self.data_bucket.get_shareclass_nav("share_price")
 
     def fill_column_8b(self):
         self.TPT_report.loc[:,self.fields["8b"]] = \
-            self.fetcher.get_shareclass_nav()["outstanding_shares"].iloc[0]
+            self.data_bucket.get_shareclass_nav("outstanding_shares")
 
     def fill_column_9(self):
         # sum of "XT72" CIC code of the instrument divided by shareclass MV
@@ -202,8 +205,8 @@ class TPT_Generator():
         self.fill_instrument_info(self.fields["13"])
 
     def fill_column_14(self):
-        column_14 = self.fetcher.get_instruments_infos()[
-            "14_Identification code of the financial instrument"]
+        column_14 = self.data_bucket.get_instruments_infos("14_Identification code of the financial instrument")
+        
         self.TPT_report[self.fields["14"]].update(column_14.to_numpy())
 
     def fill_column_15(self):

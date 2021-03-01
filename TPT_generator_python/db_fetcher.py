@@ -64,16 +64,16 @@ class TPT_Fetcher():
                                  f"WHERE code_isin='{isin}'",
                                  self.connector)
 
-    def get_shareclass_infos(self, info=None, isin=None):
-        if isin is None and self.shareclass_infos is None:
-            self.shareclass_infos = self.fetch_shareclass_infos()
-
-        if isin is None and info is None:
-            return self.shareclass_infos
-        elif info is None:
-            return self.fetch_shareclass_infos(isin=isin)
-        else:
-            return self.fetch_shareclass_infos(isin=isin)[info].iloc[0]
+#    def get_shareclass_infos(self, info=None, isin=None):
+#        if isin is None and self.shareclass_infos is None:
+#            self.shareclass_infos = self.fetch_shareclass_infos()
+#
+#        if isin is None and info is None:
+#            return self.shareclass_infos
+#        elif info is None:
+#            return self.fetch_shareclass_infos(isin=isin)
+#        else:
+#            return self.fetch_shareclass_infos(isin=isin)[info].iloc[0]
 
     def get_isins_in_group(self, indicator):
         id_subfund = self.get_subfund_infos("id")
@@ -88,10 +88,10 @@ class TPT_Fetcher():
 
         return isins["code_isin"].tolist()
                                  
-    def fetch_subfund_infos(self):
+    def fetch_subfund_infos(self, subfund_id):
         #'fund_issuer_code,'
         #'fund_issuer_code_type, '
-        subfund_id = self.get_shareclass_infos("id_subfund")
+        #subfund_id = self.get_shareclass_infos("id_subfund")
         self.subfund_infos = pd.read_sql_query('SELECT '
                                                'id, '
                                                'subfund_name, '
@@ -105,15 +105,16 @@ class TPT_Fetcher():
                                                f"WHERE id='{subfund_id}'", 
                                                self.connector)
 
-    def get_subfund_infos(self, info=None):
-        if self.subfund_infos is None:
-            self.fetch_subfund_infos()
-        self.subfund_infos["subfund_indicator"] = self.subfund_infos["subfund_code"].iloc[0].split("_")[1] + "-NH"
-        
-        if info is None:
-            return self.subfund_infos
-        else:
-            return self.subfund_infos[info].iloc[0]
+        return self.subfund_infos
+    #def get_subfund_infos(self, info=None):
+    #    if self.subfund_infos is None:
+    #        self.fetch_subfund_infos()
+    #    self.subfund_infos["subfund_indicator"] = self.subfund_infos["subfund_code"].iloc[0].split("_")[1] + "-NH"
+    #    
+    #    if info is None:
+    #        return self.subfund_infos
+    #    else:
+    #        return self.subfund_infos[info].iloc[0]
                         
     def fetch_fund_infos(self):
         #'fund_issuer_group_code, '
@@ -145,14 +146,14 @@ class TPT_Fetcher():
         else:
             return self.fund_infos[info].iloc[0]
 
-    def fetch_shareclass_nav(self, isin=None):
-        if isin is None:
-            sc_id = self.get_shareclass_infos("id")
-        else:
-            sc_id = self.get_shareclass_infos(isin=isin, info="id")
-        
-        sc_curr = self.get_shareclass_infos(isin=isin, info="shareclass_currency")
-        sf_curr = self.get_subfund_infos("subfund_currency")
+    def fetch_shareclass_nav(self, sc_id, sc_curr, sf_curr):
+        #if isin is None:
+        #    sc_id = self.get_shareclass_infos("id")
+        #else:
+        #    sc_id = self.get_shareclass_infos(isin=isin, info="id")
+        #
+        #sc_curr = self.get_shareclass_infos(isin=isin, info="shareclass_currency")
+        #sf_curr = self.get_subfund_infos("subfund_currency")
 
         nav = pd.read_sql_query('SELECT '
                                 'nav_date, '
@@ -183,22 +184,22 @@ class TPT_Fetcher():
                                                                       self.connector)    
         return nav
 
-    def get_shareclass_nav(self, info=None, isin=None):
-        if isin is None and self.shareclass_nav is None:
-            self.shareclass_nav = self.fetch_shareclass_nav()
-        
-        #print("isin: ", isin)
-        #print("info: ", info)
+#    def get_shareclass_nav(self, info=None, isin=None):
+#        if isin is None and self.shareclass_nav is None:
+#            self.shareclass_nav = self.fetch_shareclass_nav()
+#        
+#        #print("isin: ", isin)
+#        #print("info: ", info)
+#
+#        if isin is None and info is None:
+#            return self.shareclass_nav
+#        elif info is None:
+#            return self.fetch_shareclass_nav(isin)
+#        else:
+#            return self.fetch_shareclass_nav(isin)[info].iloc[0]
 
-        if isin is None and info is None:
-            return self.shareclass_nav
-        elif info is None:
-            return self.fetch_shareclass_nav(isin)
-        else:
-            return self.fetch_shareclass_nav(isin)[info].iloc[0]
-
-    def fetch_instruments(self):
-        subfund_id = self.get_subfund_infos("id")
+    def fetch_instruments(self, subfund_id):
+        #subfund_id = self.get_subfund_infos("id")
         infos = ', '.join(["asset_id_string",
                            "hedge_indicator",
                            "asset_name",
@@ -257,32 +258,32 @@ class TPT_Fetcher():
         #self.instruments["market_asset"] = self.instruments["market_and_accrued_asset"] - self.instruments["accrued_asset"]
         self.instruments["market_and_accrued_asset"] = self.instruments["market_asset"] + self.instruments["accrued_asset"]
         
-        self.instruments["hedge_indicator"].fillna(self.get_subfund_infos("subfund_indicator"), inplace=True)
+        return self.instruments
 
-    def get_instruments(self, info=None, indicator=None):
-        # get all instruments associated to the subfund
-        if self.instruments is None:
-            self.fetch_instruments()
+#    def get_instruments(self, info=None, indicator=None):
+#        # get all instruments associated to the subfund
+#        if self.instruments is None:
+#            self.fetch_instruments()
+#
+#        # return all required info of all instruments associated to the required shareclass or group
+#        if indicator == "all":
+#            return self.instruments
+#        elif indicator is None:
+#            indicators = self.get_shareclass_infos(["shareclass", "shareclass_id"]).tolist()
+#            indicators.append(self.get_subfund_infos("subfund_indicator"))
+#            indicator=indicators
+#        
+#        if info is None:
+#            return self.instruments.loc[self.instruments["hedge_indicator"].isin(indicator)]
+#        else:
+#            return self.instruments.loc[self.instruments["hedge_indicator"].isin(indicator), info]
 
-        # return all required info of all instruments associated to the required shareclass or group
-        if indicator == "all":
-            return self.instruments
-        elif indicator is None:
-            indicators = self.get_shareclass_infos(["shareclass", "shareclass_id"]).tolist()
-            indicators.append(self.get_subfund_infos("subfund_indicator"))
-            indicator=indicators
-        
-        if info is None:
-            return self.instruments.loc[self.instruments["hedge_indicator"].isin(indicator)]
-        else:
-            return self.instruments.loc[self.instruments["hedge_indicator"].isin(indicator), info]
-
-    def fetch_instruments_infos(self):
+    def fetch_instruments_infos(self, isins_list):
 
         #######################################################################
         ##################### GET MISSING DATA FROM EXCEL #####################
         #######################################################################
-        self.fetch_missing_infos()
+        self.fetch_missing_infos(isins_list)
         #######################################################################
         
         instruments_infos_dict = {
@@ -347,7 +348,8 @@ class TPT_Fetcher():
             "88_Explicit guarantee by the country of issue of the underlying asset" : "explicit_guarantee_by_the_country_of_issue_of_the_underlying_asset",
             "89_Credit quality step of the underlying asset" : "credit_quality_step_of_the_underlying_asset"}
 
-        codes = "', '".join(self.get_instruments(indicator="all").index.tolist())
+        #self.get_instruments(indicator="all").index.tolist()
+        codes = "', '".join(isins_list)
         infos = ', '.join(instruments_infos_dict.values())
         query = f"SELECT {infos} FROM intranet.dbo.instrument i"\
                 +" INNER JOIN iso_code iso ON iso.id = i.id_iso_code"\
@@ -420,12 +422,12 @@ class TPT_Fetcher():
         self.instruments_infos["94_Convexity / gamma for derivatives"].replace("-", np.nan, inplace=True)
         self.instruments_infos["94b_Vega"].replace("-", np.nan, inplace=True)
         
-    def get_instruments_infos(self, info=None):
-        if self.instruments_infos is None:
-            self.fetch_instruments_infos()
-        
-        return self.instruments_infos.loc[
-            self.instruments_infos["14_Identification code of the financial instrument"].isin(self.get_instruments().index)]
+#    def get_instruments_infos(self, info=None):
+#        if self.instruments_infos is None:
+#            self.fetch_instruments_infos()
+#        
+#        return self.instruments_infos.loc[
+#            self.instruments_infos["14_Identification code of the financial instrument"].isin(self.get_instruments().index)]
     
     def substract_cash(self, isin, dedicated_group):
         # sum the value of cash instruments in shareclass
@@ -448,7 +450,7 @@ class TPT_Fetcher():
         #NAV - included_cash * (NAV / TOTAL_NAV)
 
 
-    def fetch_missing_infos(self):
+    def fetch_missing_infos(self, isins_list):
         AODB_file_name = "AO Data Base v0.8.xlsx"
         BBG_file_name = "AO_Bloomberg_Template_SII.xlsx"
         AODB_file_path = self.source_dir / AODB_file_name
@@ -490,7 +492,7 @@ class TPT_Fetcher():
         #end = timer()
         #print(f"loaded ccy sheet in {end - start_CCY} seconds.")
         #print(f"loaded missing data in {end - start} seconds.")
-        self.bloomberg_infos = BBG.loc[BBG["ISIN"].isin(self.get_instruments().index),
+        self.bloomberg_infos = BBG.loc[BBG["ISIN"].isin(isins_list),
                                   ["ISIN",
                                    "YAS_RISK",
                                    "YAS_MOD_DUR",
