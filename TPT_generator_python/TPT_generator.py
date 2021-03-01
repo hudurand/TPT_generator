@@ -357,8 +357,7 @@ class TPT_Generator():
         SC_nav= self.fetcher.get_shareclass_nav("shareclass_total_net_asset_sf_curr")
         total_nav, SC_nav_minus_cash = self.fetcher.substract_cash(self.shareclass_isin, SC_indicator) 
 
-        print(SC_nav)
-        print(self.get_calc("market_and_accrued_fund")["CA01CHFHA"])
+#        print(SC_nav)
         SC_instruments_index = self.fetcher.get_instruments().loc[
             self.fetcher.get_instruments("hedge_indicator") == SC_indicator].index
         F_instruments_index = self.fetcher.get_instruments().loc[
