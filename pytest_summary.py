@@ -2,7 +2,7 @@ import json
 import pytest 
 
 pytest.main(["--report-log=test_log.json", "--tb=no",
-             "-k not _116[ and not _120[ and not _133["]) 
+             "-k not _59[ and not _116[ and not _120[ and not _133["]) 
 
 report_log = []
 with open("./logs/test_log.json", 'r') as f:
