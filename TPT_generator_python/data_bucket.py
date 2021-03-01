@@ -1,4 +1,5 @@
 import pandas as pd
+from .processor import get_sp_instrument_infos
 
 class Data_Bucket():
 
@@ -89,7 +90,14 @@ class Data_Bucket():
 
     def get_instruments_infos(self, info=None):
         if self.instruments_infos is None:
-            self.instruments_infos = self.fetcher.fetch_instruments_infos(self.get_instruments().index)
+            instrument_id_list = self.get_instruments().index
+            db_instruments_infos = self.fetcher.fetch_instruments_infos(instrument_id_list)
+            sp_instruments_infos = get_sp_instrument_infos(
+                #client,
+                #instruments
+                #keys but in a better way pls
+            )
+            self.instruments_infos = sp_instruments_infos.append(db_instruments_infos)
         
         return self.instruments_infos.loc[
             self.instruments_infos["14_Identification code of the financial instrument"].isin(self.get_instruments().index)]

@@ -278,12 +278,12 @@ class TPT_Fetcher():
 #        else:
 #            return self.instruments.loc[self.instruments["hedge_indicator"].isin(indicator), info]
 
-    def fetch_instruments_infos(self, isins_list):
+    def fetch_db_instruments_infos(self, id_list):
 
         #######################################################################
         ##################### GET MISSING DATA FROM EXCEL #####################
         #######################################################################
-        self.fetch_missing_infos(isins_list)
+        self.fetch_missing_infos(id_list)
         #######################################################################
         
         instruments_infos_dict = {
@@ -349,7 +349,7 @@ class TPT_Fetcher():
             "89_Credit quality step of the underlying asset" : "credit_quality_step_of_the_underlying_asset"}
 
         #self.get_instruments(indicator="all").index.tolist()
-        codes = "', '".join(isins_list)
+        codes = "', '".join(id_list)
         infos = ', '.join(instruments_infos_dict.values())
         query = f"SELECT {infos} FROM intranet.dbo.instrument i"\
                 +" INNER JOIN iso_code iso ON iso.id = i.id_iso_code"\
@@ -366,62 +366,7 @@ class TPT_Fetcher():
         self.bloomberg_infos = self.bloomberg_infos[~self.bloomberg_infos.index.duplicated()]
         db_instruments_infos = pd.concat([db_instruments_infos, self.bloomberg_infos], axis=1)
 
-        sp_instruments_infos = get_sp_instrument_infos(self.client, self.get_instruments(indicator="all"), instruments_infos_dict.keys())
-                
-        sp_instruments_infos.loc[:,
-            "46_Issuer name"] = self.AODB_CASH.loc[self.AODB_CASH["Client"] == self.client, "46_Issuer name"].iloc[0]
-        sp_instruments_infos.loc[:,
-            "47_Issuer identification code"] = self.AODB_CASH.loc[self.AODB_CASH["Client"] == self.client, "47_Issuer identification code"].iloc[0]
-        sp_instruments_infos.loc[:,
-            "49_Name of the group of the issuer"] = self.AODB_CASH.loc[self.AODB_CASH["Client"] == self.client, "49_Name of the group of the issuer"].iloc[0]
-        sp_instruments_infos.loc[:,
-            "50_Identification of the group"] = self.AODB_CASH.loc[self.AODB_CASH["Client"] == self.client, "50_Identification of the group"].iloc[0]
-        sp_instruments_infos.loc[:,
-            "51_Type of identification code for issuer group"] = self.AODB_CASH.loc[self.AODB_CASH["Client"] == self.client, "51_Type of identification code for issuer group"].iloc[0]
-        sp_instruments_infos.loc[:,
-            "52_Issuer country"] = self.AODB_CASH.loc[self.AODB_CASH["Client"] == self.client, "52_Issuer country"].iloc[0]
-        sp_instruments_infos.loc[:,
-            "53_Issuer economic area"] = self.AODB_CASH.loc[self.AODB_CASH["Client"] == self.client, "53_Issuer economic area"].iloc[0]
-        sp_instruments_infos.loc[:,
-            "54_Economic sector"] = self.AODB_CASH.loc[self.AODB_CASH["Client"] == self.client, "54_Economic sector"].iloc[0]
-              
-        self.instruments_infos = sp_instruments_infos.append(db_instruments_infos)
-        
-        self.instruments_infos.loc[:,
-            "16_Grouping code for multiple leg instruments"
-            ] = pd.to_numeric(self.instruments["contract_number"])
-        self.instruments_infos.loc[:,
-            "17_Instrument name"
-            ] = self.instruments["asset_name"].astype('str')
-        self.instruments_infos.loc[:,
-            "39_Maturity date"
-            ] = self.instruments["maturity_date"].astype('str')
-
-        self.instruments_infos["59_Credit quality step"] = \
-            self.instruments_infos["12_CIC code of the instrument"].apply(
-                lambda x: map_CQS(x, self.client, self.AODB_CASH))
-        self.instruments_infos["61_Strike price"].where(~self.get_instruments("contract_number").notnull(),
-                                                        self.get_instruments("contract_number").apply(lambda x: compute_strike_price(self.get_instruments(), x)),
-                                                        inplace=True)
-
-        self.instruments_infos.reset_index(inplace=True)
-        self.instruments_infos.drop(columns="14_Identification code of the financial instrument",
-                                    inplace=True)
-        self.instruments_infos.rename(columns={"index" : "14_Identification code of the financial instrument"}, 
-                                      inplace=True)
-
-        self.instruments_infos["17_Instrument name"].replace({"Subscription tax IEH": "Subscription tax"}, regex=True, inplace=True)
-        self.instruments_infos["17_Instrument name"].replace({"Subscription tax I": "Subscription tax"}, regex=True, inplace=True)
-        self.instruments_infos["21_Quotation currency (A)"].replace({"GBp":"GBP"}, inplace=True)        
-        self.instruments_infos["55_Covered / not covered"].replace({"n/a" : np.nan}, regex=True, inplace=True)
-        self.instruments_infos["93_Sensitivity to underlying asset price (delta)"].replace("-", np.nan, inplace=True)
-        self.instruments_infos["90_Modified Duration to maturity date"].replace("-", np.nan, inplace=True)
-        self.instruments_infos["91_Modified duration to next option exercise date"].replace("-", np.nan, inplace=True)
-        self.instruments_infos["92_Credit sensitivity"].replace("-", np.nan, inplace=True)
-        self.instruments_infos["93_Sensitivity to underlying asset price (delta)"].replace("-", np.nan, inplace=True)
-        self.instruments_infos["94_Convexity / gamma for derivatives"].replace("-", np.nan, inplace=True)
-        self.instruments_infos["94b_Vega"].replace("-", np.nan, inplace=True)
-        
+        return db_instruments_infos
 #    def get_instruments_infos(self, info=None):
 #        if self.instruments_infos is None:
 #            self.fetch_instruments_infos()
@@ -429,6 +374,7 @@ class TPT_Fetcher():
 #        return self.instruments_infos.loc[
 #            self.instruments_infos["14_Identification code of the financial instrument"].isin(self.get_instruments().index)]
     
+    #TODO: move to processor
     def substract_cash(self, isin, dedicated_group):
         # sum the value of cash instruments in shareclass
         included_cash = self.get_instruments(indicator=[dedicated_group],
@@ -450,7 +396,7 @@ class TPT_Fetcher():
         #NAV - included_cash * (NAV / TOTAL_NAV)
 
 
-    def fetch_missing_infos(self, isins_list):
+    def fetch_missing_infos(self, id_list):
         AODB_file_name = "AO Data Base v0.8.xlsx"
         BBG_file_name = "AO_Bloomberg_Template_SII.xlsx"
         AODB_file_path = self.source_dir / AODB_file_name
@@ -492,16 +438,16 @@ class TPT_Fetcher():
         #end = timer()
         #print(f"loaded ccy sheet in {end - start_CCY} seconds.")
         #print(f"loaded missing data in {end - start} seconds.")
-        self.bloomberg_infos = BBG.loc[BBG["ISIN"].isin(isins_list),
-                                  ["ISIN",
-                                   "YAS_RISK",
-                                   "YAS_MOD_DUR",
-                                   "CV_MODEL_DELTA_S",
-                                   "DUR_ADJ_MTY_MID",
-                                   "cv_model_gamma_v",
-                                   "CV_MODEL_vega",
-                                   "cv_model_cnvs_prem",
-                                   "Bond floor"]]
+        self.bloomberg_infos = BBG.loc[BBG["ISIN"].isin(id_list),
+                                       ["ISIN",
+                                        "YAS_RISK",
+                                        "YAS_MOD_DUR",
+                                        "CV_MODEL_DELTA_S",
+                                        "DUR_ADJ_MTY_MID",
+                                        "cv_model_gamma_v",
+                                        "CV_MODEL_vega",
+                                        "cv_model_cnvs_prem",
+                                        "Bond floor"]]
         
         self.bloomberg_infos.rename(columns={"YAS_RISK" : "92_Credit sensitivity",
                                              "YAS_MOD_DUR" : "91_Modified duration to next option exercise date",
