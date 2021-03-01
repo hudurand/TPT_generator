@@ -4,16 +4,26 @@ from pathlib import Path
 if __name__ == "__main__":
 
     DATE = "2020-12-31"
-    CLIENT = "BIL"
-    ISIN = "LU1689732417"
+    CLIENT = "Dynasty"
+    ISIN = "LU1280365476"
     SOURCE_DIR = Path("./data")
 
     f = TPT_Fetcher(DATE, CLIENT, ISIN, SOURCE_DIR)
 
-    #print(f.get_shareclass_infos("code_isin"))
-    #print(f.get_subfund_infos("id"))
-    print(f.get_instruments_infos())
-    #print(f.get_instruments_infos().loc[f.get_instruments_infos()['14_Identification code of the financial instrument'] == 'CH0559601544', "93_Sensitivity to underlying asset price (delta)"])
-    #print(f.get_instruments().loc["286_2", ["market_and_accrued_fund", "market_fund", "accrued_fund"]])
-    #print(f.get_instruments().loc["286_2", ["market_and_accrued_asset", "market_asset", "accrued_asset"]])
-    #print(f.get_instruments().loc["581_2", ["market_and_accrued_fund", "market_fund", "accrued_fund"]])
+#    print(f.get_shareclass_infos())
+#    print(f.get_subfund_infos())
+#    print(f.get_fund_infos())
+    #print(f.get_instruments("market_and_accrued_fund"))
+#    print(f.get_instruments_infos())
+    #group_id = f.get_shareclass_infos("shareclass")
+    #print(group_id)
+    instruments = f.get_instruments()
+    print(instruments.loc["CA01CHFHA", "market_and_accrued_fund"])
+    print(instruments.loc[instruments["market_fund"]==0, "market_fund"])
+#    #f.get_instruments_infos()
+#
+    #dedicated_group = f.get_isins_in_group(group_id)
+    #print(dedicated_group)
+    #for code_isin in dedicated_group:
+    #    print(f.substract_cash(code_isin, group_id))
+    #    #print(f.get_shareclass_nav(isin=code_isin))

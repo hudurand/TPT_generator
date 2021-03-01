@@ -1,8 +1,9 @@
-from TPT_generator import TPT_Generator
+from TPT_generator_python import TPT_Generator
 from timeit import default_timer as timer
+import pandas as pd
 
 if __name__ == "__main__":
-    DATE = "2020-12-31"
+    DATE = pd.to_datetime("2020-12-31").date()
     CLIENT = "BIL"
     #ISIN = #"LU1689729546"
     ISIN = "LU1689732417"
@@ -12,15 +13,22 @@ if __name__ == "__main__":
            #"LU1689730122"
            #"LU1689730718"
            #"LU1689730809"
+
+    SOURCE_DIR = './data'
+    OUTPUT_DIR = './production/Dynasty'
+
     start = timer()
     g = TPT_Generator(DATE,
                       CLIENT,
-                      ISIN)
+                      ISIN,
+                      SOURCE_DIR,
+                      OUTPUT_DIR)
 
+    g.fill_column_19()
     #print(g.cash_flows)
-    g.create_empty_report()
-    g.generate()
-    g.output_excel()
-    #print(g.TPT_report.loc[g.TPT_report[g.fields["14"]]=="FR0013245867", g.fields["97"]])
+    #{g.create_empty_report()
+    #g.generate()
+    #g.output_excel()
+    print(g.TPT_report[g.fields["19"]])
     end = timer()
     print(end - start)

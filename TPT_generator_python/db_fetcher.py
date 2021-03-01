@@ -48,41 +48,59 @@ class TPT_Fetcher():
         self.fetch_instruments()
         self.fetch_instruments_infos()
 
-    def fetch_shareclass_infos(self):
-        self.shareclass_infos = pd.read_sql_query('SELECT '
-                                                  'id, '
-                                                  'code_isin, '
-                                                  'shareclass, '
-                                                  'shareclass_id, '
-                                                  'shareclass_currency, '
-                                                  'shareclass_name, '
-                                                  'id_subfund, '
-                                                  'type_tpt '
-                                                  'FROM intranet.dbo.shareclass '
-                                                  f"WHERE code_isin='{self.shareclass_isin}'",
-                                                  self.connector)
+    def fetch_shareclass_infos(self, isin=None):
+        if isin is None:
+            isin = self.shareclass_isin
+        return pd.read_sql_query('SELECT '
+                                 'id, '
+                                 'code_isin, '
+                                 'shareclass, '
+                                 'shareclass_id, '
+                                 'shareclass_currency, '
+                                 'shareclass_name, '
+                                 'id_subfund, '
+                                 'type_tpt '
+                                 'FROM intranet.dbo.shareclass '
+                                 f"WHERE code_isin='{isin}'",
+                                 self.connector)
 
-    def get_shareclass_infos(self, info=None):
-        if self.shareclass_infos is None:
-            self.fetch_shareclass_infos()
+    def get_shareclass_infos(self, info=None, isin=None):
+        if isin is None and self.shareclass_infos is None:
+            self.shareclass_infos = self.fetch_shareclass_infos()
 
-        if info is None:
+        if isin is None and info is None:
             return self.shareclass_infos
+        elif info is None:
+            return self.fetch_shareclass_infos(isin=isin)
         else:
-            return self.shareclass_infos[info].iloc[0]
+            return self.fetch_shareclass_infos(isin=isin)[info].iloc[0]
 
+    def get_isins_in_group(self, indicator):
+        id_subfund = self.get_subfund_infos("id")
+        isins = pd.read_sql_query('SELECT '
+                                 'code_isin '
+                                 'FROM intranet.dbo.shareclass '
+                                 f"WHERE id_subfund='{id_subfund}'"
+                                 f"AND (shareclass_id='{indicator}' "
+                                 f"OR shareclass='{indicator}') "
+                                 "AND supprime=0",
+                                 self.connector)
+
+        return isins["code_isin"].tolist()
+                                 
     def fetch_subfund_infos(self):
+        #'fund_issuer_code,'
+        #'fund_issuer_code_type, '
         subfund_id = self.get_shareclass_infos("id_subfund")
         self.subfund_infos = pd.read_sql_query('SELECT '
-                                               'fund_issuer_code,'
-                                               'fund_issuer_code_type, '
+                                               'id, '
                                                'subfund_name, '
                                                'subfund_code, '
-                                               'fund_issuer_sector, '
-                                               'fund_cic_code, '
-                                               'id, '
-                                               'id_fund, '
-                                               'subfund_currency '
+                                               'subfund_cic, '
+                                               'subfund_nace, '
+                                               'subfund_lei, '
+                                               'subfund_currency, '
+                                               'id_fund '
                                                'FROM intranet.dbo.subfund '
                                                f"WHERE id='{subfund_id}'", 
                                                self.connector)
@@ -90,24 +108,33 @@ class TPT_Fetcher():
     def get_subfund_infos(self, info=None):
         if self.subfund_infos is None:
             self.fetch_subfund_infos()
-
+        self.subfund_infos["subfund_indicator"] = self.subfund_infos["subfund_code"].iloc[0].split("_")[1] + "-NH"
+        
         if info is None:
             return self.subfund_infos
         else:
             return self.subfund_infos[info].iloc[0]
                         
     def fetch_fund_infos(self):
+        #'fund_issuer_group_code, '
+        #'fund_issuer_group_code_type, '
+        #'fund_issuer_group_name, '
+        #'fund_issuer_country, '
+        #'fund_custodian_country, '
+        #'custodian_name '
         fund_id = self.get_subfund_infos("id_fund")
         self.fund_infos = pd.read_sql_query('SELECT '
+                                            'fund_name, '
                                             'fund_issuer_group_code, '
-                                            'fund_issuer_group_code_type, '
-                                            'fund_issuer_group_name, '
-                                            'fund_issuer_country, '
-                                            'fund_custodian_country, '
-                                            'custodian_name '
-                                            'FROM intranet.dbo.fund '
-                                            f"WHERE id='{fund_id}'", 
+                                            'fund_country, '
+                                            'depositary_lei, '
+                                            'depositary_country '
+                                            'FROM intranet.dbo.fund as f '
+                                            'INNER JOIN intranet.dbo.depositary as d '
+                                            'ON f.id_depositary=d.id '
+                                            f"WHERE f.id='{fund_id}'", 
                                             self.connector)
+        self.fund_infos.rename(columns={"depositary_lei":"fund_issuer_code"}, inplace=True)
         
     def get_fund_infos(self, info=None):
         if self.fund_infos is None:
@@ -118,67 +145,68 @@ class TPT_Fetcher():
         else:
             return self.fund_infos[info].iloc[0]
 
-    def fetch_shareclass_nav(self):
-
-        sc_id = self.get_shareclass_infos("id")
-        sc_curr = self.get_shareclass_infos("shareclass_currency")
-        sf_curr = self.get_subfund_infos("subfund_currency")
-        self.shareclass_nav = pd.read_sql_query('SELECT '
-                                                'nav_date, '
-                                                'share_price, '
-                                                'outstanding_shares '
-                                                'FROM intranet.dbo.nav '
-                                                f"WHERE id_shareclass='{sc_id}' "
-                                                f"AND nav_date='{self.date}' ",
-                                                self.connector)
-        
-        self.shareclass_nav['shareclass_total_net_asset_sc_curr'] = pd.read_sql_query('SELECT '
-                                                                                      'shareclass_total_net_asset '
-                                                                                      'FROM intranet.dbo.nav '
-                                                                                      f"WHERE id_shareclass='{sc_id}' "
-                                                                                      f"AND nav_date='{self.date}' "
-                                                                                      f"AND nav_currency='{sc_curr}'",
-                                                                                      self.connector)
-
-        self.shareclass_nav['shareclass_total_net_asset_sf_curr'] = pd.read_sql_query('SELECT '
-                                                                                      'shareclass_total_net_asset '
-                                                                                      'FROM intranet.dbo.nav '
-                                                                                      f"WHERE id_shareclass='{sc_id}' "
-                                                                                      f"AND nav_date='{self.date}' "
-                                                                                      f"AND nav_currency='{sf_curr}'",
-                                                                                      self.connector)    
-
-    def get_shareclass_nav(self, info=None):
-        if self.shareclass_nav is None:
-            self.fetch_shareclass_nav()
-
-        if info is None:
-            return self.shareclass_nav
-        elif info == "Hedged":
-            self.shareclass_nav["Hedged"] = compute_hedge_sc(self.get_shareclass_infos("shareclass"),
-                                                             self.get_shareclass_nav("shareclass_total_net_asset_sf_curr"),
-                                                             self.get_instruments())
-            return self.shareclass_nav["Hedged"].iloc[0]
+    def fetch_shareclass_nav(self, isin=None):
+        if isin is None:
+            sc_id = self.get_shareclass_infos("id")
         else:
-            return self.shareclass_nav[info].iloc[0]
+            sc_id = self.get_shareclass_infos(isin=isin, info="id")
+        
+        sc_curr = self.get_shareclass_infos(isin=isin, info="shareclass_currency")
+        sf_curr = self.get_subfund_infos("subfund_currency")
+
+        nav = pd.read_sql_query('SELECT '
+                                'nav_date, '
+                                'share_price, '
+                                'outstanding_shares, '
+                                'shareclass_total_net_asset '
+                                'FROM intranet.dbo.nav '
+                                f"WHERE id_shareclass='{sc_id}' "
+                                f"AND nav_date='{self.date}' "
+                                f"AND nav_currency='{sc_curr}'",
+                                self.connector)
+        
+        nav.rename(columns={"shareclass_total_net_asset":"shareclass_total_net_asset_sc_curr"}, inplace=True)
+        #nav['shareclass_total_net_asset_sc_curr'] = pd.read_sql_query('SELECT '
+        #                                                              
+        #                                                              'FROM intranet.dbo.nav '
+        #                                                              f"WHERE id_shareclass='{sc_id}' "
+        #                                                              f"AND nav_date='{self.date}' "
+        #                                                              f"AND nav_currency='{sc_curr}'",
+        #                                                              self.connector)
+
+        nav['shareclass_total_net_asset_sf_curr'] = pd.read_sql_query('SELECT '
+                                                                      'shareclass_total_net_asset '
+                                                                      'FROM intranet.dbo.nav '
+                                                                      f"WHERE id_shareclass='{sc_id}' "
+                                                                      f"AND nav_date='{self.date}' "
+                                                                      f"AND nav_currency='{sf_curr}'",
+                                                                      self.connector)    
+        return nav
+
+    def get_shareclass_nav(self, info=None, isin=None):
+        if isin is None and self.shareclass_nav is None:
+            self.shareclass_nav = self.fetch_shareclass_nav()
+        
+        #print("isin: ", isin)
+        #print("info: ", info)
+
+        if isin is None and info is None:
+            return self.shareclass_nav
+        elif info is None:
+            return self.fetch_shareclass_nav(isin)
+        else:
+            return self.fetch_shareclass_nav(isin)[info].iloc[0]
 
     def fetch_instruments(self):
-        if self.client == 'BIL':
-            sc_indicator = self.get_shareclass_infos("shareclass")
-            hedging_condition = f"hedge_indicator='{sc_indicator}' OR hedge_indicator IS NULL"
-        elif self.client == 'Dynasty':
-            sc_indicator = self.get_shareclass_infos("shareclass_id")
-            subfund_code = self.get_subfund_infos("subfund_code")
-            hedging_group = subfund_code.split("_")[1] + "-NH"
-            hedging_condition = f"hedge_indicator='{sc_indicator}' OR hedge_indicator='{hedging_group}'"
-
         subfund_id = self.get_subfund_infos("id")
         infos = ', '.join(["asset_id_string",
                            "hedge_indicator",
                            "asset_name",
+                           "asset_type",
                            "asset_type_3",
                            "asset_currency",
                            "quantity_nominal",
+                           "price_market",
                            "market_asset",
                            "market_fund",
                            "accrued_asset",
@@ -191,8 +219,7 @@ class TPT_Fetcher():
         query = f"SELECT {infos} FROM intranet.dbo.portfolio_data d "\
                 +"INNER JOIN portfolio p ON p.id = d.id_portfolio "\
                 +f"WHERE id_subfund='{subfund_id}' "\
-                +f"AND portfolio_date='{self.date}' " \
-                +f"AND ({hedging_condition})"
+                +f"AND portfolio_date='{self.date}'"
 
         self.instruments = pd.read_sql_query(query,
                                              self.connector)
@@ -205,7 +232,7 @@ class TPT_Fetcher():
                                           "market_fund",
                                           "accrued_fund",
                                           "market_and_accrued_asset",
-                                          #"market_asset",
+                                          "market_asset",
                                           "accrued_asset"])
             fused["quantity_nominal"] = self.instruments.groupby("asset_id_string")["quantity_nominal"].sum()
             fused["market_and_accrued_fund"] = self.instruments.groupby("asset_id_string")["market_and_accrued_fund"].sum()
@@ -226,17 +253,29 @@ class TPT_Fetcher():
 
         self.instruments["accrued_fund"].fillna(0, inplace=True)
         self.instruments["accrued_asset"].fillna(0, inplace=True)
-        self.instruments["market_fund"] = self.instruments["market_and_accrued_fund"] - self.instruments["accrued_fund"]
-        self.instruments["market_asset"] = self.instruments["market_and_accrued_asset"] - self.instruments["accrued_asset"]
+        #self.instruments["market_fund"] = self.instruments["market_and_accrued_fund"] - self.instruments["accrued_fund"]
+        #self.instruments["market_asset"] = self.instruments["market_and_accrued_asset"] - self.instruments["accrued_asset"]
+        self.instruments["market_and_accrued_asset"] = self.instruments["market_asset"] + self.instruments["accrued_asset"]
         
-    def get_instruments(self, info=None):
+        self.instruments["hedge_indicator"].fillna(self.get_subfund_infos("subfund_indicator"), inplace=True)
+
+    def get_instruments(self, info=None, indicator=None):
+        # get all instruments associated to the subfund
         if self.instruments is None:
             self.fetch_instruments()
 
-        if info is None:
+        # return all required info of all instruments associated to the required shareclass or group
+        if indicator == "all":
             return self.instruments
+        elif indicator is None:
+            indicators = self.get_shareclass_infos(["shareclass", "shareclass_id"]).tolist()
+            indicators.append(self.get_subfund_infos("subfund_indicator"))
+            indicator=indicators
+        
+        if info is None:
+            return self.instruments.loc[self.instruments["hedge_indicator"].isin(indicator)]
         else:
-            return self.instruments[info]
+            return self.instruments.loc[self.instruments["hedge_indicator"].isin(indicator), info]
 
     def fetch_instruments_infos(self):
 
@@ -308,7 +347,7 @@ class TPT_Fetcher():
             "88_Explicit guarantee by the country of issue of the underlying asset" : "explicit_guarantee_by_the_country_of_issue_of_the_underlying_asset",
             "89_Credit quality step of the underlying asset" : "credit_quality_step_of_the_underlying_asset"}
 
-        codes = "', '".join(self.get_instruments().index.tolist())
+        codes = "', '".join(self.get_instruments(indicator="all").index.tolist())
         infos = ', '.join(instruments_infos_dict.values())
         query = f"SELECT {infos} FROM intranet.dbo.instrument i"\
                 +" INNER JOIN iso_code iso ON iso.id = i.id_iso_code"\
@@ -325,7 +364,7 @@ class TPT_Fetcher():
         self.bloomberg_infos = self.bloomberg_infos[~self.bloomberg_infos.index.duplicated()]
         db_instruments_infos = pd.concat([db_instruments_infos, self.bloomberg_infos], axis=1)
 
-        sp_instruments_infos = get_sp_instrument_infos(self.client, self.get_instruments(), instruments_infos_dict.keys())
+        sp_instruments_infos = get_sp_instrument_infos(self.client, self.get_instruments(indicator="all"), instruments_infos_dict.keys())
                 
         sp_instruments_infos.loc[:,
             "46_Issuer name"] = self.AODB_CASH.loc[self.AODB_CASH["Client"] == self.client, "46_Issuer name"].iloc[0]
@@ -381,11 +420,34 @@ class TPT_Fetcher():
         self.instruments_infos["94_Convexity / gamma for derivatives"].replace("-", np.nan, inplace=True)
         self.instruments_infos["94b_Vega"].replace("-", np.nan, inplace=True)
         
-    def get_instruments_infos(self):
+    def get_instruments_infos(self, info=None):
         if self.instruments_infos is None:
             self.fetch_instruments_infos()
-        return self.instruments_infos
+        
+        return self.instruments_infos.loc[
+            self.instruments_infos["14_Identification code of the financial instrument"].isin(self.get_instruments().index)]
     
+    def substract_cash(self, isin, dedicated_group):
+        # sum the value of cash instruments in shareclass
+        included_cash = self.get_instruments(indicator=[dedicated_group],
+                                             info="market_and_accrued_fund").sum()
+
+        isins = self.get_isins_in_group(dedicated_group)
+
+        NAV = self.get_shareclass_nav(info="shareclass_total_net_asset_sf_curr",
+                                      isin=isin)
+        TOTAL_NAV = 0
+        
+        for i in isins:
+            TOTAL_NAV += self.get_shareclass_nav(info="shareclass_total_net_asset_sf_curr",
+                                                 isin=i)
+        #print("included_cash", included_cash)
+        #print("NAV ", NAV)
+        #print("TOTAL NAV ", TOTAL_NAV)
+        return  TOTAL_NAV, NAV * (1 - included_cash / TOTAL_NAV)
+        #NAV - included_cash * (NAV / TOTAL_NAV)
+
+
     def fetch_missing_infos(self):
         AODB_file_name = "AO Data Base v0.8.xlsx"
         BBG_file_name = "AO_Bloomberg_Template_SII.xlsx"

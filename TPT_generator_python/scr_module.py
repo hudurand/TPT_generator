@@ -154,7 +154,7 @@ class SCR_Module():
     def spread_risk_parameter(self, bond_type, duration, CQS):
         duration_group = min(duration // 5, 4)
         if bond_type == 1:
-            a, b = self.general_bonds_param[duration_group][9]            
+            a, b = self.general_bonds_param[duration_group][CQS]            
         elif bond_type == 2:
             a, b = self.covered_bonds_param[duration_group][CQS]
         elif bond_type == 3:

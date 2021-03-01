@@ -1,10 +1,11 @@
 import json
 import pytest 
 
-pytest.main(["--report-log=test_log.json", "--tb=no"]) 
+pytest.main(["--report-log=test_log.json", "--tb=no",
+             "-k not _116[ and not _120[ and not _133["]) 
 
 report_log = []
-with open("./test_log.json", 'r') as f:
+with open("./logs/test_log.json", 'r') as f:
     for l in f.readlines():
         report_log.append(json.loads(l))
 

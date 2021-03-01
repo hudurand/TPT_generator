@@ -4,13 +4,13 @@ source_dir: './data'
 clients: 
     BIL:
         shareclasses: 
-            - 'LU1689729546'
-            - 'LU1689732417'
-            - 'LU1689729629'
+            #- 'LU1689729546'
+            #- 'LU1689732417'
+            #- 'LU1689729629'
             - 'LU1808854803'
-            - 'LU1689730122'
-            - 'LU1689730718'
-            - 'LU1689730809'
+            #- 'LU1689730122'
+            #- 'LU1689730718'
+            #- 'LU1689730809'
         output_dir: './production/BIL'
 #    Dynasty:
 #        shareclasses: 

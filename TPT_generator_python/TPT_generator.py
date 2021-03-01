@@ -48,6 +48,7 @@ class TPT_Generator():
 
     def generate(self):
         for field in self.fields:
+            print(f"fill_column_{field}...")
             getattr(self, f"fill_column_{field}")()
 
     def create_empty_report(self):
@@ -96,17 +97,24 @@ class TPT_Generator():
                                                            "accrued_fund",
                                                            "accrued_asset",
                                                            "market_and_accrued_fund",
-                                                           "market_and_accrued_asset"]]
+                                                           "market_and_accrued_asset",
+                                                           "price_market"]]
 
-        self.INTER["S"] = 0
+        #self.INTER["S"] = 0
         self.INTER["quantity_nominal"].fillna(0, inplace=True)
-        self.INTER["QN"] = self.INTER["S"] * self.INTER["quantity_nominal"] / self.INTER["market_asset"]
+        self.INTER["price_market"].fillna(0, inplace=True)
+        self.INTER["market_asset"].fillna(0, inplace=True)
+        #print(self.INTER["price_market"])
+        #print(self.INTER["quantity_nominal"])
+        #print(self.INTER["market_asset"])
+        self.INTER["QN"] = self.INTER["price_market"] * self.INTER["quantity_nominal"] / self.INTER["market_asset"]
+        self.INTER.sort_index(inplace=True)
 
     def check_required(self, required_fields):
         for field in required_fields:
             if self.TPT_report[self.fields[field]].isnull().values.all():
+                print(f"fill_column_{field}")
                 getattr(self, f"fill_column_{field}")()
-
 
     def get_calc(self, col=None):
         if self.INTER is None:
@@ -169,7 +177,7 @@ class TPT_Generator():
         
         TOTAL_CASH = self.TPT_report.loc[self.TPT_report[self.fields["12"]]=="XT72",
                                          self.fields["24"]].sum()
-        
+        #print(TOTAL_CASH)
         self.TPT_report[self.fields["9"]] = TOTAL_CASH / self.TPT_report[self.fields["5"]]
     
     def fill_column_10(self):
@@ -213,18 +221,23 @@ class TPT_Generator():
     def fill_column_18(self):
         self.check_required(["12", "23"])
 
-        assert not self.TPT_report[self.fields["12"]].str.match("..22").any(), "some CIC code ends with 22 and are not supported yet"
+        #assert not self.TPT_report[self.fields["12"]].str.match("..22").any(), "some CIC code ends with 22 and are not supported yet"
 
         self.TPT_report.set_index([self.fields["14"]], inplace=True)
-
-        pattern = '|'.join([f"..{code}" for code in self.IN18])
+        
 
         column_18 = pd.Series(index=self.TPT_report.index)
         column_18 = self.get_calc("quantity_nominal") \
                     * self.TPT_report[self.fields["23"]] \
                     / self.get_calc("market_asset")
 
-        column_18.where(self.TPT_report[self.fields["12"]].str.match(pattern),
+        pattern = '|'.join([f"..{code}" for code in self.IN18])
+
+        condition = (self.TPT_report[self.fields["12"]].str.match(pattern) \
+                    | ((self.TPT_report[self.fields["12"]].str[2:] == "22") \
+                    & (self.INTER["QN"].round(0) == 1.0)))
+
+        column_18.where(condition,
                         np.nan,
                         inplace=True)
 
@@ -234,17 +247,22 @@ class TPT_Generator():
     def fill_column_19(self):
         self.check_required(["12", "23"])
 
-        assert not self.TPT_report[self.fields["12"]].str.match("..22").any(), "some CIC code ends with 22 and are not supported yet"
+        #assert not self.TPT_report[self.fields["12"]].str.match("..22").any(), "some CIC code ends with 22 and are not supported yet"
 
         self.TPT_report.set_index([self.fields["14"]], inplace=True)
-
-        pattern = '|'.join([f"..{code}" for code in self.IN18])
 
         column_19 = self.get_calc("quantity_nominal") \
                       * self.TPT_report[self.fields["23"]] \
                       / self.get_calc("market_asset")
+        
+        pattern = '|'.join([f"..{code}" for code in self.IN18])
 
-        column_19.where(~self.TPT_report[self.fields["12"]].str.match(pattern),
+        condition = ~((self.TPT_report[self.fields["12"]].str.match(pattern)) \
+                    | ((self.TPT_report[self.fields["12"]].str[2:] == "22") \
+                    & ~(self.INTER["QN"].round(0) == 100.0)))
+
+        print(condition)
+        column_19.where(condition,
                        np.nan,
                        inplace=True)
 
@@ -317,50 +335,61 @@ class TPT_Generator():
         self.check_required(["14", "24"])
 
         self.TPT_report.set_index([self.fields["14"]], inplace=True)
-        column_25 = self.TPT_report[self.fields["24"]] \
-                    / self.get_calc("market_and_accrued_fund") \
-                    * self.get_calc("market_fund")
         
-        self.TPT_report[self.fields["25"]].update(column_25)
+        column_25 = self.TPT_report[self.fields["24"]] \
+                    / self.get_calc("market_and_accrued_fund").replace({0:np.nan}) \
+                    * self.get_calc("market_fund").replace({0:np.nan})
+        
+        self.TPT_report[self.fields["25"]].update(column_25.fillna(0))
         self.TPT_report.reset_index(inplace=True)
 
     def fill_column_26(self):
         self.check_required(["14"])
         
-        SC_indicator = self.fetcher.get_shareclass_infos()["shareclass"].iloc[0]
-        SC_NAV = self.fetcher.get_shareclass_nav()["shareclass_total_net_asset_sf_curr"].iloc[0]
-        Hedged_SC = self.fetcher.get_shareclass_nav("Hedged")
-        SC_instruments_index = self.fetcher.get_instruments().loc[
-            self.fetcher.get_instruments()["hedge_indicator"] == SC_indicator].index
-        F_instruments_index = self.fetcher.get_instruments().loc[
-            self.fetcher.get_instruments()["hedge_indicator"].isnull()].index
-
-        total_MV_fnd_ccy = self.get_calc("market_and_accrued_fund")[F_instruments_index].sum()
-        
         column_26 = pd.DataFrame(index=self.TPT_report[self.fields["14"]], columns=["valuation weight"])
+
+        if self.client == "BIL":
+            SC_indicator = self.fetcher.get_shareclass_infos("shareclass")
+        if self.client == "Dynasty":
+            SC_indicator = self.fetcher.get_shareclass_infos("shareclass_id")
+        SF_indicator = self.fetcher.get_subfund_infos("subfund_indicator")
+
+        SC_nav= self.fetcher.get_shareclass_nav("shareclass_total_net_asset_sf_curr")
+        total_nav, SC_nav_minus_cash = self.fetcher.substract_cash(self.shareclass_isin, SC_indicator) 
+
+        print(SC_nav)
+        print(self.get_calc("market_and_accrued_fund")["CA01CHFHA"])
+        SC_instruments_index = self.fetcher.get_instruments().loc[
+            self.fetcher.get_instruments("hedge_indicator") == SC_indicator].index
+        F_instruments_index = self.fetcher.get_instruments().loc[
+            self.fetcher.get_instruments("hedge_indicator") == SF_indicator].index
+
+        #print("CA01CHFHA" in SC_instruments_index)
+        total_MV_fnd_ccy = self.get_calc("market_and_accrued_fund")[F_instruments_index].sum()
+
         column_26.loc[SC_instruments_index, "valuation weight"] = \
-            self.get_calc("market_and_accrued_fund")[SC_instruments_index] / SC_NAV
+            self.get_calc("market_and_accrued_fund")[SC_instruments_index] / total_nav
         column_26.loc[F_instruments_index, "valuation weight"] = \
             (self.get_calc("market_and_accrued_fund")[F_instruments_index] / total_MV_fnd_ccy) \
-            * (Hedged_SC / SC_NAV)
-                                                                  
+            * (SC_nav_minus_cash / SC_nav)
+
         self.TPT_report.set_index([self.fields["14"]], inplace=True)
         self.TPT_report[self.fields["26"]].update(column_26["valuation weight"])
         self.TPT_report.reset_index(inplace=True)
 
     def fill_column_27(self):
         self.check_required(["14", "23", "25", "28"])
-        
+
         self.TPT_report.set_index([self.fields["14"]], inplace=True)
 
         column_27 = self.TPT_report[self.fields["28"]] \
                                     * self.TPT_report[self.fields["23"]] \
                                     / self.TPT_report[self.fields["25"]]
-                                    
+
         self.TPT_report[self.fields["27"]].update(column_27)
 
         self.TPT_report.reset_index(inplace=True)
-        
+
     def fill_column_28(self):
         self.check_required(["12", "18", "19", "20", "21", "23", "25", "61", "62", "71", "72"])
 
@@ -371,7 +400,7 @@ class TPT_Generator():
         AI = self.fetcher.get_instruments()["market_and_accrued_asset"].where(
                 ~self.TPT_report[self.fields["12"]].str.match(pattern),
                 self.fetcher.get_instruments().apply(lambda x: self.compute_exception_AI(x), axis=1))
-        
+
         column_28 = AI \
                     * (self.TPT_report[self.fields["18"]].replace(np.nan, 0) \
                        + self.TPT_report[self.fields["19"]].replace(np.nan, 0)) \
@@ -668,7 +697,7 @@ class TPT_Generator():
     def fill_column_99(self):
         def shock_down_type1(row):
             if self.TPT_report.loc[row.name, self.fields["131"]] == "3L":
-                print(row.name)
+                #print(row.name)
                 return self.TPT_report.loc[row.name, self.fields["26"]] * (0.39 + self.sym_adj/100)
 
             elif self.TPT_report.loc[row.name, self.fields["12"]][2:] == "22":
@@ -851,11 +880,11 @@ class TPT_Generator():
 
     def fill_column_115(self):
         self.TPT_report.loc[:,self.fields["115"]] = \
-            self.fetcher.get_subfund_infos()["fund_issuer_code"].iloc[0]
+            self.fetcher.get_subfund_infos("subfund_lei")
 
     def fill_column_116(self):
         self.TPT_report.loc[:,self.fields["116"]] = \
-            self.fetcher.get_subfund_infos()["fund_issuer_code_type"].astype('int64').iloc[0]
+            self.fetcher.get_subfund_infos("fund_issuer_code_type").astype('int64')
 
     def fill_column_117(self):
         self.TPT_report.loc[:,self.fields["117"]] = \
@@ -863,7 +892,7 @@ class TPT_Generator():
 
     def fill_column_118(self):
         self.TPT_report.loc[:,self.fields["118"]] = \
-            self.fetcher.get_subfund_infos()["fund_issuer_sector"].iloc[0]
+            self.fetcher.get_subfund_infos("subfund_nace")
 
     def fill_column_119(self):
         self.TPT_report.loc[:,self.fields["119"]] = \
@@ -875,19 +904,19 @@ class TPT_Generator():
 
     def fill_column_121(self):
         self.TPT_report.loc[:,self.fields["121"]] = \
-            self.fetcher.get_fund_infos()["fund_issuer_group_name"].iloc[0]
+            self.fetcher.get_fund_infos("fund_name")
 
     def fill_column_122(self):
         self.TPT_report.loc[:,self.fields["122"]] = \
-            self.fetcher.get_fund_infos()["fund_issuer_country"].iloc[0]
+            self.fetcher.get_fund_infos("fund_country")
 
     def fill_column_123(self):
         self.TPT_report.loc[:,self.fields["123"]] = \
-            self.fetcher.get_subfund_infos()["fund_cic_code"].astype('str').iloc[0]
+            self.fetcher.get_subfund_infos("subfund_cic")
 
     def fill_column_123a(self):
         self.TPT_report.loc[:,self.fields["123a"]] = \
-            self.fetcher.get_fund_infos()["fund_custodian_country"].astype('str').iloc[0]
+            self.fetcher.get_fund_infos("depositary_country")
 
     def fill_column_124(self):
         self.check_required(["10"])
@@ -1048,10 +1077,14 @@ class TPT_Generator():
         if CIC[2:] == "22":
             CX = self.TPT_report.loc[row.name, [self.fields["73"]]].iloc[0] \
                 if not pd.isnull(self.TPT_report.loc[row.name, [self.fields["73"]]].iloc[0]) else 1
-        
+            print("CIC 22 V", V)
+            print("CIC 22 BS", BS)
+            print("CIC 22 CC", CC)
+            print("CIC 22 EX", EX)
+            print("CIC 22 CX", CX)
+
             AI = max(V / BS * CC * EX * CX, 
                      row["market_and_accrued_asset"])
-            #print("CIC 22", AI)
         
         elif CIC[2:] == "A2":
             AI = min(V * W/100 * CC * EX, 
@@ -1217,7 +1250,6 @@ class TPT_Generator():
     
     def define_IN18(self):
         self.IN18 = [
-            "22",
             "29",
             "31",
             "32",
@@ -1249,52 +1281,4 @@ class TPT_Generator():
             "D1",
             "D4",
             "D5",
-            "22",
-            "29",
-            "31",
-            "32",
-            "33",
-            "34",
-            "39",
-            "41",
-            "42",
-            "43",
-            "44",
-            "45",
-            "46",
-            "47",
-            "48",
-            "49",
-            "22",
-            "29",
-            "31",
-            "32",
-            "33",
-            "34",
-            "39",
-            "41",
-            "42",
-            "43",
-            "44",
-            "45",
-            "46",
-            "47",
-            "48",
-            "49",
-            "A1",
-            "A2",
-            "A3",
-            "A5",
-            "A7",
-            "A8",
-            "A9",
-            "B1",
-            "B4",
-            "B5",
-            "C1",
-            "C4",
-            "C5",
-            "D1",
-            "D4",
-            "D5"
         ]
