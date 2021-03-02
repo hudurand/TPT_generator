@@ -4,8 +4,8 @@ import pandas as pd
 import numpy as np
 from timeit import default_timer as timer
 
-from .processor import get_sp_instrument_infos, map_CQS, compute_strike_price, compute_hedge_sc
-
+from .processor import map_CQS, compute_strike_price
+from .constants import DB_INSTRUMENTS_INFOS_MAP
 class TPT_Fetcher():
     """
     fecther class to fecth data associated 
@@ -40,13 +40,13 @@ class TPT_Fetcher():
         self.bloomberg_infos = None
         self.portfolio_NAVs= None
 
-    def fetch(self):
-        self.fetch_shareclass_infos()
-        self.fetch_subfund_infos()
-        self.fetch_fund_infos()
-        self.fetch_shareclass_nav()
-        self.fetch_instruments()
-        self.fetch_instruments_infos()
+#    def fetch(self):
+#        self.fetch_shareclass_infos()
+#        self.fetch_subfund_infos()
+#        self.fetch_fund_infos()
+#        self.fetch_shareclass_nav()
+#        self.fetch_instruments()
+#        self.fetch_instruments_infos()
 
     def fetch_shareclass_infos(self, isin=None):
         if isin is None:
@@ -64,19 +64,7 @@ class TPT_Fetcher():
                                  f"WHERE code_isin='{isin}'",
                                  self.connector)
 
-#    def get_shareclass_infos(self, info=None, isin=None):
-#        if isin is None and self.shareclass_infos is None:
-#            self.shareclass_infos = self.fetch_shareclass_infos()
-#
-#        if isin is None and info is None:
-#            return self.shareclass_infos
-#        elif info is None:
-#            return self.fetch_shareclass_infos(isin=isin)
-#        else:
-#            return self.fetch_shareclass_infos(isin=isin)[info].iloc[0]
-
-    def get_isins_in_group(self, indicator):
-        id_subfund = self.get_subfund_infos("id")
+    def fetch_isins_in_group(self, indicator, id_subfund):
         isins = pd.read_sql_query('SELECT '
                                  'code_isin '
                                  'FROM intranet.dbo.shareclass '
@@ -91,7 +79,6 @@ class TPT_Fetcher():
     def fetch_subfund_infos(self, subfund_id):
         #'fund_issuer_code,'
         #'fund_issuer_code_type, '
-        #subfund_id = self.get_shareclass_infos("id_subfund")
         self.subfund_infos = pd.read_sql_query('SELECT '
                                                'id, '
                                                'subfund_name, '
@@ -106,25 +93,15 @@ class TPT_Fetcher():
                                                self.connector)
 
         return self.subfund_infos
-    #def get_subfund_infos(self, info=None):
-    #    if self.subfund_infos is None:
-    #        self.fetch_subfund_infos()
-    #    self.subfund_infos["subfund_indicator"] = self.subfund_infos["subfund_code"].iloc[0].split("_")[1] + "-NH"
-    #    
-    #    if info is None:
-    #        return self.subfund_infos
-    #    else:
-    #        return self.subfund_infos[info].iloc[0]
-                        
-    def fetch_fund_infos(self):
+
+    def fetch_fund_infos(self, fund_id):
         #'fund_issuer_group_code, '
         #'fund_issuer_group_code_type, '
         #'fund_issuer_group_name, '
         #'fund_issuer_country, '
         #'fund_custodian_country, '
         #'custodian_name '
-        fund_id = self.get_subfund_infos("id_fund")
-        self.fund_infos = pd.read_sql_query('SELECT '
+        fund_infos = pd.read_sql_query('SELECT '
                                             'fund_name, '
                                             'fund_issuer_group_code, '
                                             'fund_country, '
@@ -135,25 +112,11 @@ class TPT_Fetcher():
                                             'ON f.id_depositary=d.id '
                                             f"WHERE f.id='{fund_id}'", 
                                             self.connector)
-        self.fund_infos.rename(columns={"depositary_lei":"fund_issuer_code"}, inplace=True)
+        fund_infos.rename(columns={"depositary_lei":"fund_issuer_code"}, inplace=True)
         
-    def get_fund_infos(self, info=None):
-        if self.fund_infos is None:
-            self.fetch_fund_infos()
-
-        if info is None:
-            return self.fund_infos
-        else:
-            return self.fund_infos[info].iloc[0]
+        return fund_infos
 
     def fetch_shareclass_nav(self, sc_id, sc_curr, sf_curr):
-        #if isin is None:
-        #    sc_id = self.get_shareclass_infos("id")
-        #else:
-        #    sc_id = self.get_shareclass_infos(isin=isin, info="id")
-        #
-        #sc_curr = self.get_shareclass_infos(isin=isin, info="shareclass_currency")
-        #sf_curr = self.get_subfund_infos("subfund_currency")
 
         nav = pd.read_sql_query('SELECT '
                                 'nav_date, '
@@ -167,13 +130,6 @@ class TPT_Fetcher():
                                 self.connector)
         
         nav.rename(columns={"shareclass_total_net_asset":"shareclass_total_net_asset_sc_curr"}, inplace=True)
-        #nav['shareclass_total_net_asset_sc_curr'] = pd.read_sql_query('SELECT '
-        #                                                              
-        #                                                              'FROM intranet.dbo.nav '
-        #                                                              f"WHERE id_shareclass='{sc_id}' "
-        #                                                              f"AND nav_date='{self.date}' "
-        #                                                              f"AND nav_currency='{sc_curr}'",
-        #                                                              self.connector)
 
         nav['shareclass_total_net_asset_sf_curr'] = pd.read_sql_query('SELECT '
                                                                       'shareclass_total_net_asset '
@@ -184,22 +140,7 @@ class TPT_Fetcher():
                                                                       self.connector)    
         return nav
 
-#    def get_shareclass_nav(self, info=None, isin=None):
-#        if isin is None and self.shareclass_nav is None:
-#            self.shareclass_nav = self.fetch_shareclass_nav()
-#        
-#        #print("isin: ", isin)
-#        #print("info: ", info)
-#
-#        if isin is None and info is None:
-#            return self.shareclass_nav
-#        elif info is None:
-#            return self.fetch_shareclass_nav(isin)
-#        else:
-#            return self.fetch_shareclass_nav(isin)[info].iloc[0]
-
     def fetch_instruments(self, subfund_id):
-        #subfund_id = self.get_subfund_infos("id")
         infos = ', '.join(["asset_id_string",
                            "hedge_indicator",
                            "asset_name",
@@ -225,7 +166,8 @@ class TPT_Fetcher():
         self.instruments = pd.read_sql_query(query,
                                              self.connector)
 
-        self.instruments.set_index("asset_id_string", inplace=True)
+        self.instruments.rename(columns={"asset_id_string":"14_Identification code of the financial instrument"}, inplace=True)
+        self.instruments.set_index("14_Identification code of the financial instrument", inplace=True)
 
         if self.instruments.index.duplicated().any():
             fused = pd.DataFrame(columns=["quantity_nominal"
@@ -235,13 +177,13 @@ class TPT_Fetcher():
                                           "market_and_accrued_asset",
                                           "market_asset",
                                           "accrued_asset"])
-            fused["quantity_nominal"] = self.instruments.groupby("asset_id_string")["quantity_nominal"].sum()
-            fused["market_and_accrued_fund"] = self.instruments.groupby("asset_id_string")["market_and_accrued_fund"].sum()
-            fused["market_fund"] = self.instruments.groupby("asset_id_string")["market_fund"].sum()
-            fused["accrued_fund"] = self.instruments.groupby("asset_id_string")["accrued_fund"].sum()
-            fused["market_and_accrued_asset"] = self.instruments.groupby("asset_id_string")["market_and_accrued_asset"].sum()
-            fused["market_asset"] = self.instruments.groupby("asset_id_string")["market_asset"].sum()
-            fused["accrued_asset"] = self.instruments.groupby("asset_id_string")["accrued_asset"].sum()
+            fused["quantity_nominal"] = self.instruments.groupby("14_Identification code of the financial instrument")["quantity_nominal"].sum()
+            fused["market_and_accrued_fund"] = self.instruments.groupby("14_Identification code of the financial instrument")["market_and_accrued_fund"].sum()
+            fused["market_fund"] = self.instruments.groupby("14_Identification code of the financial instrument")["market_fund"].sum()
+            fused["accrued_fund"] = self.instruments.groupby("14_Identification code of the financial instrument")["accrued_fund"].sum()
+            fused["market_and_accrued_asset"] = self.instruments.groupby("14_Identification code of the financial instrument")["market_and_accrued_asset"].sum()
+            fused["market_asset"] = self.instruments.groupby("14_Identification code of the financial instrument")["market_asset"].sum()
+            fused["accrued_asset"] = self.instruments.groupby("14_Identification code of the financial instrument")["accrued_asset"].sum()
 
             self.instruments = self.instruments[~self.instruments.index.duplicated()]
             self.instruments["quantity_nominal"].update(fused["quantity_nominal"])
@@ -254,29 +196,11 @@ class TPT_Fetcher():
 
         self.instruments["accrued_fund"].fillna(0, inplace=True)
         self.instruments["accrued_asset"].fillna(0, inplace=True)
-        #self.instruments["market_fund"] = self.instruments["market_and_accrued_fund"] - self.instruments["accrued_fund"]
-        #self.instruments["market_asset"] = self.instruments["market_and_accrued_asset"] - self.instruments["accrued_asset"]
-        self.instruments["market_and_accrued_asset"] = self.instruments["market_asset"] + self.instruments["accrued_asset"]
+        self.instruments["market_fund"] = self.instruments["market_and_accrued_fund"] - self.instruments["accrued_fund"]
+        self.instruments["market_asset"] = self.instruments["market_and_accrued_asset"] - self.instruments["accrued_asset"]
+        #self.instruments["market_and_accrued_asset"] = self.instruments["market_asset"] + self.instruments["accrued_asset"]
         
         return self.instruments
-
-#    def get_instruments(self, info=None, indicator=None):
-#        # get all instruments associated to the subfund
-#        if self.instruments is None:
-#            self.fetch_instruments()
-#
-#        # return all required info of all instruments associated to the required shareclass or group
-#        if indicator == "all":
-#            return self.instruments
-#        elif indicator is None:
-#            indicators = self.get_shareclass_infos(["shareclass", "shareclass_id"]).tolist()
-#            indicators.append(self.get_subfund_infos("subfund_indicator"))
-#            indicator=indicators
-#        
-#        if info is None:
-#            return self.instruments.loc[self.instruments["hedge_indicator"].isin(indicator)]
-#        else:
-#            return self.instruments.loc[self.instruments["hedge_indicator"].isin(indicator), info]
 
     def fetch_db_instruments_infos(self, id_list):
 
@@ -285,80 +209,16 @@ class TPT_Fetcher():
         #######################################################################
         self.fetch_missing_infos(id_list)
         #######################################################################
-        
-        instruments_infos_dict = {
-            "12_CIC code of the instrument" : "cic",
-            "13_Economic zone of the quotation place" : "economic_zone_of_the_quotation_place",
-            "14_Identification code of the financial instrument" : "identification_code",
-            "15_Type of identification code for the instrument" : "type_identification_code_for_the_instrument",
-            "20_Contract size for derivatives" : "contract_size_for_derivatives", 
-            "21_Quotation currency (A)" : "quotation_currency",
-            "32_Interest rate type" : "interest_rate_type",
-            "33_Coupon rate" : "coupon_rate",
-            "34_Interest rate reference identification" : "interest_rate_reference_identification",
-            "35_Identification type for interest rate index" : "identification_type_for_interest_rate_index",
-            "36_Interest rate index name" : "interest_rate_index_name",
-            "37_Interest rate Margin" : "interest_rate_margin",
-            "38_Coupon payment frequency" : "coupon_payment_frequency",
-            "40_Redemption type" : "redemption_type",
-            "41_Redemption rate" : "redemption_rate",
-            "42_Callable / putable" : "callable_puttable",
-            "43_Call / put date" : "call_put_date",
-            "44_Issuer / bearer option exercise" : "issuer_bearer_option_exercise",
-            "45_Strike price for embedded (call/put) options" : "strike_price_for_embedded_callput_options",
-            "46_Issuer name" : "issuer_name",
-            "47_Issuer identification code" : "issuer_identification_code",
-            "49_Name of the group of the issuer" : "name_of_the_group_of_the_issuer",
-            "50_Identification of the group" : "identification_of_the_group",
-            "52_Issuer country" : "iso_code_2",
-            "53_Issuer economic area" : "Geographic",
-            "54_Economic sector" : "economic_sector",
-            "55_Covered / not covered" : "covered_not_covered",
-            "56_Securitisation" : "securitisation",
-            "57_Explicit guarantee by the country of issue" : "explicit_guarantee_by_the_country_of_issue",
-            "58_Subordinated debt" : "subordinated_debt",
-            "58b_Nature of the TRANCHE" : "nature_of_the_tranche",
-            "59_Credit quality step" : "credit_quality_step",
-            "60_Call / Put / Cap / Floor" : "call_put_cap_floor",
-            "61_Strike price" : "strike_price",
-            "62_Conversion factor (convertibles) / concordance factor / parity (options)" : "conversion_factor_convertibles_concordance_factor_parity_options",
-            "63_Effective Date of Instrument" : "effective_date_of_instrument",
-            "64_Exercise type" : "exercise_type",
-            "67_CIC code of the underlying asset" : "cic_code_of_the_underlying_asset",
-            "68_Identification code of the underlying asset" : "identification_code_of_the_underlying_asset",
-            "69_Type of identification code for the underlying asset" : "type_of_identification_code_for_the_underlying_asset",
-            "70_Name of the underlying asset" : "name_of_the_underlying_asset",
-            "71_Quotation currency of the underlying asset (C)" : "quotation_currency_of_the_underlying_asset_c",
-            "72_Last valuation price of the underlying asset" : "last_valuation_price_of_the_underlying_asset",
-            "73_Country of quotation of the underlying asset" : "country_of_quotation_of_the_underlying_asset",
-            "74_Economic Area of quotation of the underlying asset" : "economic_area_of_quotation_of_the_underlying_asset",
-            "75_Coupon rate of the underlying asset" : "coupon_rate_of_the_underlying_asset",
-            "76_Coupon payment frequency of the underlying asset" :"coupon_payment_frequency_of_the_underlying_asset",
-            "77_Maturity date of the underlying asset" : "maturity_date_of_the_underlying_asset",
-            "78_Redemption profile of the underlying asset" : "redemption_profile_of_the_underlying_asset",
-            "79_Redemption rate of the underlying asset" : "redemption_rate_of_the_underlying_asset",
-            "80_Issuer name of the underlying asset" : "issuer_name_of_the_underlying_asset",
-            "81_Issuer identification code of the underlying asset" : "issuer_identification_code_of_the_underlying_asset",
-            "82_Type of issuer identification code of the underlying asset" : "type_of_issuer_identification_code_of_the_underlying_asset",
-            "83_Name of the group of the issuer of the underlying asset" : "name_of_the_group_of_the_issuer_of_the_underlying_asset",
-            "84_Identification of the group of the underlying asset" : "identification_of_the_group_of_the_underlying_asset",
-            "85_Type of the group identification code of the underlying asset" : "type_of_the_group_identification_code_of_the_underlying_asset",
-            "86_Issuer country of the underlying asset" : "issuer_country_of_the_underlying_asset",
-            "87_Issuer economic area of the underlying asset" : "issuer_economic_area_of_the_underlying_asset",
-            "88_Explicit guarantee by the country of issue of the underlying asset" : "explicit_guarantee_by_the_country_of_issue_of_the_underlying_asset",
-            "89_Credit quality step of the underlying asset" : "credit_quality_step_of_the_underlying_asset"}
 
-        #self.get_instruments(indicator="all").index.tolist()
         codes = "', '".join(id_list)
-        infos = ', '.join(instruments_infos_dict.values())
+        infos = ', '.join(DB_INSTRUMENTS_INFOS_MAP.keys())
         query = f"SELECT {infos} FROM intranet.dbo.instrument i"\
                 +" INNER JOIN iso_code iso ON iso.id = i.id_iso_code"\
                 +f" WHERE identification_code in ('{codes}')"
 
         db_instruments_infos = pd.read_sql_query(query,
                                                  self.connector)
-        
-        db_instruments_infos.rename(columns=dict((v, k) for k, v in instruments_infos_dict.items()), inplace=True)                                        
+        db_instruments_infos.rename(columns=DB_INSTRUMENTS_INFOS_MAP, inplace=True)                                        
         
         db_instruments_infos.set_index("14_Identification code of the financial instrument", inplace=True)
         self.bloomberg_infos.set_index("ISIN", inplace=True)
@@ -367,35 +227,7 @@ class TPT_Fetcher():
         db_instruments_infos = pd.concat([db_instruments_infos, self.bloomberg_infos], axis=1)
 
         return db_instruments_infos
-#    def get_instruments_infos(self, info=None):
-#        if self.instruments_infos is None:
-#            self.fetch_instruments_infos()
-#        
-#        return self.instruments_infos.loc[
-#            self.instruments_infos["14_Identification code of the financial instrument"].isin(self.get_instruments().index)]
-    
-    #TODO: move to processor
-    def substract_cash(self, isin, dedicated_group):
-        # sum the value of cash instruments in shareclass
-        included_cash = self.get_instruments(indicator=[dedicated_group],
-                                             info="market_and_accrued_fund").sum()
-
-        isins = self.get_isins_in_group(dedicated_group)
-
-        NAV = self.get_shareclass_nav(info="shareclass_total_net_asset_sf_curr",
-                                      isin=isin)
-        TOTAL_NAV = 0
-        
-        for i in isins:
-            TOTAL_NAV += self.get_shareclass_nav(info="shareclass_total_net_asset_sf_curr",
-                                                 isin=i)
-        #print("included_cash", included_cash)
-        #print("NAV ", NAV)
-        #print("TOTAL NAV ", TOTAL_NAV)
-        return  TOTAL_NAV, NAV * (1 - included_cash / TOTAL_NAV)
-        #NAV - included_cash * (NAV / TOTAL_NAV)
-
-
+  
     def fetch_missing_infos(self, id_list):
         AODB_file_name = "AO Data Base v0.8.xlsx"
         BBG_file_name = "AO_Bloomberg_Template_SII.xlsx"
@@ -458,5 +290,3 @@ class TPT_Fetcher():
                                              "cv_model_cnvs_prem" : "128_Option premium (convertible instrument only)",
                                              "Bond floor" : "127_Bond Floor (convertible instrument only)"},
                                             inplace=True)
-
-

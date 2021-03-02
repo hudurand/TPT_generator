@@ -1,4 +1,4 @@
-from TPT_generator_python import TPT_Fetcher
+from TPT_generator_python import TPT_Fetcher, Data_Bucket
 from pathlib import Path
 
 if __name__ == "__main__":
@@ -9,6 +9,7 @@ if __name__ == "__main__":
     SOURCE_DIR = Path("./data")
 
     f = TPT_Fetcher(DATE, CLIENT, ISIN, SOURCE_DIR)
+    bucket = Data_Bucket(CLIENT, f)
 
 #    print(f.get_shareclass_infos())
 #    print(f.get_subfund_infos())
@@ -17,11 +18,11 @@ if __name__ == "__main__":
 #    print(f.get_instruments_infos())
     #group_id = f.get_shareclass_infos("shareclass")
     #print(group_id)
-    instruments = f.get_instruments()
-    print(instruments.loc["CA01CHFHA", "market_and_accrued_fund"])
-    print(instruments.loc[instruments["market_fund"]==0, "market_fund"])
-#    #f.get_instruments_infos()
-#
+    instruments = bucket.get_instruments()
+    #print(instruments)
+    infos = bucket.get_instruments_infos()
+    print(infos)
+
     #dedicated_group = f.get_isins_in_group(group_id)
     #print(dedicated_group)
     #for code_isin in dedicated_group:

@@ -11,6 +11,8 @@ from .db_fetcher import TPT_Fetcher
 from .cash_flow import Cash_Flow
 from .scr_module import SCR_Module
 from .data_bucket import Data_Bucket
+from .processor import Data_Processor
+from .constants import IN18, FIELDS
 
 class TPT_Generator():
     """
@@ -35,8 +37,8 @@ class TPT_Generator():
         self.output_dir = Path(output_dir)
 
         self.sym_adj = sym_adj
-        self.define_fields()
-        self.define_IN18()
+        self.fields = FIELDS
+        self.IN18 = IN18
         self.cash_flows = Cash_Flow(self.date.strftime('%Y%m%d'))
         self.scr_module = SCR_Module()
 
@@ -44,14 +46,15 @@ class TPT_Generator():
                                    self.client,
                                    self.shareclass_isin,
                                    self.source_dir)
-        self.data_bucket = Data_Bucket(self.fetcher)
-        
+        self.data_bucket = Data_Bucket(self.client,
+                                       self.fetcher)
+        self.processor = Data_Processor(self.data_bucket,
+                                        self.fetcher)
         self.create_empty_report()
-        self.INTER = None
 
     def generate(self):
         for field in self.fields:
-            print(f"fill_column_{field}...")
+            #print(f"fill_column_{field}...")
             getattr(self, f"fill_column_{field}")()
 
     def create_empty_report(self):
@@ -93,47 +96,16 @@ class TPT_Generator():
 
         template.save(self.output_dir / output_file_name)
 
-    def compute_intermediate_calc(self):
-        self.INTER = self.fetcher.get_instruments().loc[:,["quantity_nominal",
-                                                           "market_fund",
-                                                           "market_asset",
-                                                           "accrued_fund",
-                                                           "accrued_asset",
-                                                           "market_and_accrued_fund",
-                                                           "market_and_accrued_asset",
-                                                           "price_market"]]
-
-        #self.INTER["S"] = 0
-        self.INTER["quantity_nominal"].fillna(0, inplace=True)
-        self.INTER["price_market"].fillna(0, inplace=True)
-        self.INTER["market_asset"].fillna(0, inplace=True)
-        #print(self.INTER["price_market"])
-        #print(self.INTER["quantity_nominal"])
-        #print(self.INTER["market_asset"])
-        self.INTER["QN"] = self.INTER["price_market"] * self.INTER["quantity_nominal"] / self.INTER["market_asset"]
-        self.INTER.sort_index(inplace=True)
-
     def check_required(self, required_fields):
         for field in required_fields:
             if self.TPT_report[self.fields[field]].isnull().values.all():
-                print(f"fill_column_{field}")
+                #print(f"fill_column_{field}")
                 getattr(self, f"fill_column_{field}")()
-
-    def get_calc(self, col=None):
-        if self.INTER is None:
-            self.compute_intermediate_calc()
-        if col is None:
-            return self.INTER
-        else:
-            return self.INTER[col]
 
     def fill_instrument_info(self, info):
         self.check_required(["14"])
 
-        column = self.fetcher.get_instruments_infos().loc[:,
-            [self.fields["14"], 
-             info
-            ]].set_index([self.fields["14"]])
+        column = self.data_bucket.get_instruments_infos(info)
         self.TPT_report.set_index([self.fields["14"]], inplace=True)
         self.TPT_report[info].update(
             column[info])
@@ -205,7 +177,7 @@ class TPT_Generator():
         self.fill_instrument_info(self.fields["13"])
 
     def fill_column_14(self):
-        column_14 = self.data_bucket.get_instruments_infos("14_Identification code of the financial instrument")
+        column_14 = self.data_bucket.get_instruments_infos().index
         
         self.TPT_report[self.fields["14"]].update(column_14.to_numpy())
 
@@ -223,22 +195,22 @@ class TPT_Generator():
 
     def fill_column_18(self):
         self.check_required(["12", "23"])
-
+        self.processor.compute_QN()
         #assert not self.TPT_report[self.fields["12"]].str.match("..22").any(), "some CIC code ends with 22 and are not supported yet"
 
         self.TPT_report.set_index([self.fields["14"]], inplace=True)
         
 
         column_18 = pd.Series(index=self.TPT_report.index)
-        column_18 = self.get_calc("quantity_nominal") \
+        column_18 = self.data_bucket.get_instruments("quantity_nominal") \
                     * self.TPT_report[self.fields["23"]] \
-                    / self.get_calc("market_asset")
+                    / self.data_bucket.get_instruments("market_asset")
 
         pattern = '|'.join([f"..{code}" for code in self.IN18])
 
         condition = (self.TPT_report[self.fields["12"]].str.match(pattern) \
                     | ((self.TPT_report[self.fields["12"]].str[2:] == "22") \
-                    & (self.INTER["QN"].round(0) == 1.0)))
+                    & (self.data_bucket.get_instruments("QN").round(0) == 1.0)))
 
         column_18.where(condition,
                         np.nan,
@@ -249,22 +221,23 @@ class TPT_Generator():
 
     def fill_column_19(self):
         self.check_required(["12", "23"])
+        self.processor.compute_QN()
 
         #assert not self.TPT_report[self.fields["12"]].str.match("..22").any(), "some CIC code ends with 22 and are not supported yet"
 
         self.TPT_report.set_index([self.fields["14"]], inplace=True)
 
-        column_19 = self.get_calc("quantity_nominal") \
+        column_19 = self.data_bucket.get_instruments("quantity_nominal") \
                       * self.TPT_report[self.fields["23"]] \
-                      / self.get_calc("market_asset")
+                      / self.data_bucket.get_instruments("market_asset")
         
         pattern = '|'.join([f"..{code}" for code in self.IN18])
 
         condition = ~((self.TPT_report[self.fields["12"]].str.match(pattern)) \
                     | ((self.TPT_report[self.fields["12"]].str[2:] == "22") \
-                    & ~(self.INTER["QN"].round(0) == 100.0)))
+                    & ~(self.data_bucket.get_instruments("QN").round(0) == 100.0)))
 
-        print(condition)
+        #print(condition)
         column_19.where(condition,
                        np.nan,
                        inplace=True)
@@ -281,23 +254,23 @@ class TPT_Generator():
     def fill_column_22(self):
         self.check_required(["21", "24"])
 
-        subfund_curr = self.fetcher.get_subfund_infos()["subfund_currency"].iloc[0] #fund base currency
-        portfolio_curr = self.fetcher.get_shareclass_infos()["shareclass_currency"].iloc[0]
-        EUR_fx_rate = self.fetcher.get_shareclass_nav()["shareclass_total_net_asset_sf_curr"].iloc[0]\
-            / self.fetcher.get_shareclass_nav()["shareclass_total_net_asset_sc_curr"].iloc[0]
+        subfund_curr = self.data_bucket.get_subfund_infos()["subfund_currency"].iloc[0] #fund base currency
+        portfolio_curr = self.data_bucket.get_shareclass_infos()["shareclass_currency"].iloc[0]
+        EUR_fx_rate = self.data_bucket.get_shareclass_nav()["shareclass_total_net_asset_sf_curr"].iloc[0]\
+            / self.data_bucket.get_shareclass_nav()["shareclass_total_net_asset_sc_curr"].iloc[0]
         self.TPT_report.set_index([self.fields["14"]], inplace=True)
 
         if subfund_curr == portfolio_curr:
             column_22 = self.TPT_report[self.fields["24"]].where(
                             self.TPT_report[self.fields["21"]] == portfolio_curr,
                             self.TPT_report[self.fields["24"]] \
-                                * self.get_calc("market_and_accrued_asset") \
-                                / self.get_calc("market_and_accrued_fund") \
+                                * self.data_bucket.get_instruments("market_and_accrued_asset") \
+                                / self.data_bucket.get_instruments("market_and_accrued_fund") \
                                 * EUR_fx_rate)
         else:
             column_22 = self.TPT_report[self.fields["24"]] \
-                        * self.get_calc("market_and_accrued_asset") \
-                        / self.get_calc("market_and_accrued_fund") \
+                        * self.data_bucket.get_instruments("market_and_accrued_asset") \
+                        / self.data_bucket.get_instruments("market_and_accrued_fund") \
                         * EUR_fx_rate
 
         self.TPT_report[self.fields["22"]].update(column_22)
@@ -306,23 +279,23 @@ class TPT_Generator():
     def fill_column_23(self):
         self.check_required(["21", "25"])
 
-        subfund_curr = self.fetcher.get_subfund_infos()["subfund_currency"].iloc[0] #fund base currency
-        portfolio_curr = self.fetcher.get_shareclass_infos()["shareclass_currency"].iloc[0]
-        EUR_fx_rate = self.fetcher.get_shareclass_nav()["shareclass_total_net_asset_sf_curr"].iloc[0]\
-            / self.fetcher.get_shareclass_nav()["shareclass_total_net_asset_sc_curr"].iloc[0]
+        subfund_curr = self.data_bucket.get_subfund_infos()["subfund_currency"].iloc[0] #fund base currency
+        portfolio_curr = self.data_bucket.get_shareclass_infos()["shareclass_currency"].iloc[0]
+        EUR_fx_rate = self.data_bucket.get_shareclass_nav()["shareclass_total_net_asset_sf_curr"].iloc[0]\
+            / self.data_bucket.get_shareclass_nav()["shareclass_total_net_asset_sc_curr"].iloc[0]
         self.TPT_report.set_index([self.fields["14"]], inplace=True)
 
         if subfund_curr == portfolio_curr:
             column_23 = self.TPT_report[self.fields["25"]].where(
                             self.TPT_report[self.fields["21"]] == portfolio_curr,
                             self.TPT_report[self.fields["25"]] \
-                                * self.get_calc("market_and_accrued_asset") \
-                                / self.get_calc("market_and_accrued_fund") \
+                                * self.data_bucket.get_instruments("market_and_accrued_asset") \
+                                / self.data_bucket.get_instruments("market_and_accrued_fund") \
                                 * EUR_fx_rate)
         else:
             column_23 = self.TPT_report[self.fields["25"]] \
-                        * self.get_calc("market_and_accrued_asset") \
-                        / self.get_calc("market_and_accrued_fund") \
+                        * self.data_bucket.get_instruments("market_and_accrued_asset") \
+                        / self.data_bucket.get_instruments("market_and_accrued_fund") \
                         * EUR_fx_rate
 
         self.TPT_report[self.fields["23"]].update(column_23)
@@ -340,8 +313,8 @@ class TPT_Generator():
         self.TPT_report.set_index([self.fields["14"]], inplace=True)
         
         column_25 = self.TPT_report[self.fields["24"]] \
-                    / self.get_calc("market_and_accrued_fund").replace({0:np.nan}) \
-                    * self.get_calc("market_fund").replace({0:np.nan})
+                    / self.data_bucket.get_instruments("market_and_accrued_fund").replace({0:np.nan}) \
+                    * self.data_bucket.get_instruments("market_fund").replace({0:np.nan})
         
         self.TPT_report[self.fields["25"]].update(column_25.fillna(0))
         self.TPT_report.reset_index(inplace=True)
@@ -352,27 +325,26 @@ class TPT_Generator():
         column_26 = pd.DataFrame(index=self.TPT_report[self.fields["14"]], columns=["valuation weight"])
 
         if self.client == "BIL":
-            SC_indicator = self.fetcher.get_shareclass_infos("shareclass")
+            SC_indicator = self.data_bucket.get_shareclass_infos("shareclass")
         if self.client == "Dynasty":
-            SC_indicator = self.fetcher.get_shareclass_infos("shareclass_id")
-        SF_indicator = self.fetcher.get_subfund_infos("subfund_indicator")
+            SC_indicator = self.data_bucket.get_shareclass_infos("shareclass_id")
+        SF_indicator = self.data_bucket.get_subfund_infos("subfund_indicator")
 
-        SC_nav= self.fetcher.get_shareclass_nav("shareclass_total_net_asset_sf_curr")
-        total_nav, SC_nav_minus_cash = self.fetcher.substract_cash(self.shareclass_isin, SC_indicator) 
+        SC_nav= self.data_bucket.get_shareclass_nav("shareclass_total_net_asset_sf_curr")
+        total_nav, SC_nav_minus_cash = self.processor.compute_sp_distribution(self.shareclass_isin,
+                                                                    SC_indicator) 
 
-#        print(SC_nav)
-        SC_instruments_index = self.fetcher.get_instruments().loc[
-            self.fetcher.get_instruments("hedge_indicator") == SC_indicator].index
-        F_instruments_index = self.fetcher.get_instruments().loc[
-            self.fetcher.get_instruments("hedge_indicator") == SF_indicator].index
+        SC_instruments_index = self.data_bucket.get_instruments().loc[
+            self.data_bucket.get_instruments("hedge_indicator") == SC_indicator].index
+        F_instruments_index = self.data_bucket.get_instruments().loc[
+            self.data_bucket.get_instruments("hedge_indicator") == SF_indicator].index
 
-        #print("CA01CHFHA" in SC_instruments_index)
-        total_MV_fnd_ccy = self.get_calc("market_and_accrued_fund")[F_instruments_index].sum()
+        total_MV_fnd_ccy = self.data_bucket.get_instruments("market_and_accrued_fund")[F_instruments_index].sum()
 
         column_26.loc[SC_instruments_index, "valuation weight"] = \
-            self.get_calc("market_and_accrued_fund")[SC_instruments_index] / total_nav
+            self.data_bucket.get_instruments("market_and_accrued_fund")[SC_instruments_index] / total_nav
         column_26.loc[F_instruments_index, "valuation weight"] = \
-            (self.get_calc("market_and_accrued_fund")[F_instruments_index] / total_MV_fnd_ccy) \
+            (self.data_bucket.get_instruments("market_and_accrued_fund")[F_instruments_index] / total_MV_fnd_ccy) \
             * (SC_nav_minus_cash / SC_nav)
 
         self.TPT_report.set_index([self.fields["14"]], inplace=True)
@@ -399,14 +371,14 @@ class TPT_Generator():
 
         pattern = "..22|..A2|..B4"
 
-        AI = self.fetcher.get_instruments()["market_and_accrued_asset"].where(
+        AI = self.data_bucket.get_instruments("market_and_accrued_asset").where(
                 ~self.TPT_report[self.fields["12"]].str.match(pattern),
-                self.fetcher.get_instruments().apply(lambda x: self.compute_exception_AI(x), axis=1))
+                self.data_bucket.get_instruments().apply(lambda x: self.compute_exception_AI(x), axis=1))
 
         column_28 = AI \
                     * (self.TPT_report[self.fields["18"]].replace(np.nan, 0) \
                        + self.TPT_report[self.fields["19"]].replace(np.nan, 0)) \
-                    / self.get_calc("quantity_nominal") \
+                    / self.data_bucket.get_instruments("quantity_nominal") \
                     * self.TPT_report[self.fields["25"]] \
                     / self.TPT_report[self.fields["23"]]
 
@@ -660,7 +632,7 @@ class TPT_Generator():
         self.TPT_report.set_index([self.fields["14"]], inplace=True)
 
         if not self.cash_flows.actualized:
-            self.cash_flows.compute(self.TPT_report.join(self.get_calc("quantity_nominal")))
+            self.cash_flows.compute(self.TPT_report.join(self.data_bucket.get_instruments("quantity_nominal")))
         
         column_97 = pd.DataFrame(index=self.TPT_report.index, columns=["col"])
         
@@ -699,7 +671,6 @@ class TPT_Generator():
     def fill_column_99(self):
         def shock_down_type1(row):
             if self.TPT_report.loc[row.name, self.fields["131"]] == "3L":
-                #print(row.name)
                 return self.TPT_report.loc[row.name, self.fields["26"]] * (0.39 + self.sym_adj/100)
 
             elif self.TPT_report.loc[row.name, self.fields["12"]][2:] == "22":
@@ -882,43 +853,45 @@ class TPT_Generator():
 
     def fill_column_115(self):
         self.TPT_report.loc[:,self.fields["115"]] = \
-            self.fetcher.get_subfund_infos("subfund_lei")
+            self.data_bucket.get_subfund_infos("subfund_lei")
 
     def fill_column_116(self):
-        self.TPT_report.loc[:,self.fields["116"]] = \
-            self.fetcher.get_subfund_infos("fund_issuer_code_type").astype('int64')
+        pass
+        #self.TPT_report.loc[:,self.fields["116"]] = \
+        #    self.data_bucket.get_subfund_infos("fund_issuer_code_type").astype('int64')
 
     def fill_column_117(self):
         self.TPT_report.loc[:,self.fields["117"]] = \
-            self.fetcher.get_subfund_infos()["subfund_name"].iloc[0]
+            self.data_bucket.get_subfund_infos("subfund_name")
 
     def fill_column_118(self):
         self.TPT_report.loc[:,self.fields["118"]] = \
-            self.fetcher.get_subfund_infos("subfund_nace")
+            self.data_bucket.get_subfund_infos("subfund_nace")
 
     def fill_column_119(self):
         self.TPT_report.loc[:,self.fields["119"]] = \
-            self.fetcher.get_fund_infos()["fund_issuer_group_code"].iloc[0]
+            self.data_bucket.get_fund_infos("fund_issuer_group_code")
 
     def fill_column_120(self):
-        self.TPT_report.loc[:,self.fields["120"]] = \
-            self.fetcher.get_fund_infos()["fund_issuer_group_code_type"].astype('int64').iloc[0]
+        pass
+        #self.TPT_report.loc[:,self.fields["120"]] = \
+        #    self.data_bucket.get_fund_infos("fund_issuer_group_code_type")
 
     def fill_column_121(self):
         self.TPT_report.loc[:,self.fields["121"]] = \
-            self.fetcher.get_fund_infos("fund_name")
+            self.data_bucket.get_fund_infos("fund_name")
 
     def fill_column_122(self):
         self.TPT_report.loc[:,self.fields["122"]] = \
-            self.fetcher.get_fund_infos("fund_country")
+            self.data_bucket.get_fund_infos("fund_country")
 
     def fill_column_123(self):
         self.TPT_report.loc[:,self.fields["123"]] = \
-            self.fetcher.get_subfund_infos("subfund_cic")
+            self.data_bucket.get_subfund_infos("subfund_cic")
 
     def fill_column_123a(self):
         self.TPT_report.loc[:,self.fields["123a"]] = \
-            self.fetcher.get_fund_infos("depositary_country")
+            self.data_bucket.get_fund_infos("depositary_country")
 
     def fill_column_124(self):
         self.check_required(["10"])
@@ -930,9 +903,9 @@ class TPT_Generator():
                 
         self.TPT_report.set_index([self.fields["14"]], inplace=True)
 
-        column_125 = self.get_calc("accrued_asset") \
+        column_125 = self.data_bucket.get_instruments("accrued_asset") \
                      * self.TPT_report[self.fields["22"]] \
-                     / self.get_calc("market_and_accrued_asset")
+                     / self.data_bucket.get_instruments("market_and_accrued_asset")
 
         self.TPT_report[self.fields["125"]].update(column_125)
         self.TPT_report[self.fields["125"]].fillna(0, inplace=True)
@@ -944,9 +917,9 @@ class TPT_Generator():
                 
         self.TPT_report.set_index([self.fields["14"]], inplace=True)
 
-        column_126 = self.get_calc("accrued_fund") \
+        column_126 = self.data_bucket.get_instruments("accrued_fund") \
                      * self.TPT_report[self.fields["24"]] \
-                     / self.get_calc("market_and_accrued_fund")
+                     / self.data_bucket.get_instruments("market_and_accrued_fund")
 
         self.TPT_report[self.fields["126"]].update(column_126)
         self.TPT_report[self.fields["126"]].fillna(0, inplace=True)
@@ -991,8 +964,9 @@ class TPT_Generator():
         pass
 
     def fill_column_133(self):
-        self.TPT_report.loc[:,self.fields["133"]] = \
-            self.fetcher.get_fund_infos()["custodian_name"].iloc[0]
+        pass
+        #self.TPT_report.loc[:,self.fields["133"]] = \
+        #    self.data_bucket.get_fund_infos("custodian_name")
 
     def fill_column_134(self):
         pass
@@ -1079,11 +1053,6 @@ class TPT_Generator():
         if CIC[2:] == "22":
             CX = self.TPT_report.loc[row.name, [self.fields["73"]]].iloc[0] \
                 if not pd.isnull(self.TPT_report.loc[row.name, [self.fields["73"]]].iloc[0]) else 1
-            print("CIC 22 V", V)
-            print("CIC 22 BS", BS)
-            print("CIC 22 CC", CC)
-            print("CIC 22 EX", EX)
-            print("CIC 22 CX", CX)
 
             AI = max(V / BS * CC * EX * CX, 
                      row["market_and_accrued_asset"])
@@ -1092,195 +1061,13 @@ class TPT_Generator():
             AI = min(V * W/100 * CC * EX, 
                      row["market_and_accrued_asset"])
             
-            #print("CIC A2", AI)
         elif CIC[2:] == "B4":
             BT = self.TPT_report.loc[row.name, [self.fields["62"]]].iloc[0]\
                  if not pd.isnull(self.TPT_report.loc[row.name, [self.fields["62"]]].iloc[0]) else 1
             AI = max(V * BT * (CC-BS) * EX,
                      row["market_and_accrued_asset"])
-            #print("CIC B4", AI)
 
         else:
             AI = row["market_and_accrued_asset"]
 
         return AI
-
-    def define_fields(self):
-        self.fields = {
-            "1" : r"1_Portfolio identifying data",
-            "2" : r"2_Type of identification code for the fund share or portfolio",
-            "3" : r"3_Portfolio name",
-            "4" : r"4_Portfolio currency (B)",
-            "5" : r"5_Net asset valuation of the portfolio or the share class in portfolio currency",
-            "6" : r"6_Valuation date",
-            "7" : r"7_Reporting date",
-            "8" : r"8_Share price",
-            "8b" : r"8b_Total number of shares",
-            "9" : r"9_% cash",
-            "10" : r"10_Portfolio Modified Duration",
-            "11" : r"11_Complete SCR Delivery",
-            "12" : r"12_CIC code of the instrument",
-            "13" : r"13_Economic zone of the quotation place",
-            "14" : r"14_Identification code of the financial instrument",
-            "15" : r"15_Type of identification code for the instrument",
-            "16" : r"16_Grouping code for multiple leg instruments",
-            "17" : r"17_Instrument name",
-            "17b" : r"17b_Asset / Liability",
-            "18" : r"18_Quantity",
-            "19" : r"19_Nominal amount",
-            "20" : r"20_Contract size for derivatives",
-            "21" : r"21_Quotation currency (A)",
-            "22" : r"22_Market valuation in quotation currency (A)",
-            "23" : r"23_Clean market valuation in quotation currency (A)",
-            "24" : r"24_Market valuation in portfolio currency (B)",
-            "25" : r"25_Clean market valuation in portfolio currency (B)",
-            "26" : r"26_Valuation weight",
-            "27" : r"27_Market exposure amount in quotation currency (A)",
-            "28" : r"28_Market exposure amount in portfolio currency (B)",
-            "29" : r"29_Market exposure amount for the 3rd currency in quotation currency of the underlying asset (C)",
-            "30" : r"30_Market Exposure in weight",
-            "31" : r"31_Market exposure for the 3rd currency in weight over NAV",
-            "32" : r"32_Interest rate type",
-            "33" : r"33_Coupon rate",
-            "34" : r"34_Interest rate reference identification",
-            "35" : r"35_Identification type for interest rate index",
-            "36" : r"36_Interest rate index name",
-            "37" : r"37_Interest rate Margin",
-            "38" : r"38_Coupon payment frequency",
-            "39" : r"39_Maturity date",
-            "40" : r"40_Redemption type",
-            "41" : r"41_Redemption rate",
-            "42" : r"42_Callable / putable",
-            "43" : r"43_Call / put date",
-            "44" : r"44_Issuer / bearer option exercise",
-            "45" : r"45_Strike price for embedded (call/put) options",
-            "46" : r"46_Issuer name",
-            "47" : r"47_Issuer identification code",
-            "48" : r"48_Type of identification code for issuer",
-            "49" : r"49_Name of the group of the issuer",
-            "50" : r"50_Identification of the group",
-            "51" : r"51_Type of identification code for issuer group",
-            "52" : r"52_Issuer country",
-            "53" : r"53_Issuer economic area",
-            "54" : r"54_Economic sector",
-            "55" : r"55_Covered / not covered",
-            "56" : r"56_Securitisation",
-            "57" : r"57_Explicit guarantee by the country of issue",
-            "58" : r"58_Subordinated debt",
-            "58b" : r"58b_Nature of the TRANCHE",
-            "59" : r"59_Credit quality step",
-            "60" : r"60_Call / Put / Cap / Floor",
-            "61" : r"61_Strike price",
-            "62" : r"62_Conversion factor (convertibles) / concordance factor / parity (options)",
-            "63" : r"63_Effective Date of Instrument",
-            "64" : r"64_Exercise type",
-            "65" : r"65_Hedging Rolling",
-            "67" : r"67_CIC code of the underlying asset",
-            "68" : r"68_Identification code of the underlying asset",
-            "69" : r"69_Type of identification code for the underlying asset",
-            "70" : r"70_Name of the underlying asset",
-            "71" : r"71_Quotation currency of the underlying asset (C)",
-            "72" : r"72_Last valuation price of the underlying asset",
-            "73" : r"73_Country of quotation of the underlying asset",
-            "74" : r"74_Economic Area of quotation of the underlying asset",
-            "75" : r"75_Coupon rate of the underlying asset",
-            "76" : r"76_Coupon payment frequency of the underlying asset",
-            "77" : r"77_Maturity date of the underlying asset",
-            "78" : r"78_Redemption profile of the underlying asset",
-            "79" : r"79_Redemption rate of the underlying asset",
-            "80" : r"80_Issuer name of the underlying asset",
-            "81" : r"81_Issuer identification code of the underlying asset",
-            "82" : r"82_Type of issuer identification code of the underlying asset",
-            "83" : r"83_Name of the group of the issuer of the underlying asset",
-            "84" : r"84_Identification of the group of the underlying asset",
-            "85" : r"85_Type of the group identification code of the underlying asset",
-            "86" : r"86_Issuer country of the underlying asset",
-            "87" : r"87_Issuer economic area of the underlying asset",
-            "88" : r"88_Explicit guarantee by the country of issue of the underlying asset",
-            "89" : r"89_Credit quality step of the underlying asset",
-            "90" : r"90_Modified Duration to maturity date",
-            "91" : r"91_Modified duration to next option exercise date",
-            "92" : r"92_Credit sensitivity",
-            "93" : r"93_Sensitivity to underlying asset price (delta)",
-            "94" : r"94_Convexity / gamma for derivatives",
-            "94b" : r"94b_Vega",
-            "95" : r"95_Identification of the original portfolio for positions embedded in a fund",
-            "97" : r"97_SCR_Mrkt_IR_up weight over NAV",
-            "98" : r"98_SCR_Mrkt_IR_down weight over NAV",
-            "99" : r"99_SCR_Mrkt_Eq_type1 weight over NAV",
-            "100" : r"100_SCR_Mrkt_Eq_type2 weight over NAV",
-            "101" : r"101_SCR_Mrkt_Prop weight over NAV",
-            "102" : r"102_SCR_Mrkt_Spread_bonds weight over NAV",
-            "103" : r"103_SCR_Mrkt_Spread_structured weight over NAV",
-            "104" : r"104_SCR_Mrkt_Spread_derivatives_up weight over NAV",
-            "105" : r"105_SCR_Mrkt_Spread_derivatives_down weight over NAV",
-            "105a" : r"105a_SCR_Mrkt_FX_up weight over NAV",
-            "105b" : r"105b_SCR_Mrkt_FX_down weight over NAV",
-            "106" : r"106_Asset pledged as collateral",
-            "107" : r"107_Place of deposit",
-            "108" : r"108_Participation",
-            "110" : r"110_Valorisation method",
-            "111" : r"111_Value of acquisition",
-            "112" : r"112_Credit rating",
-            "113" : r"113_Rating agency",
-            "114" : r"114_Issuer economic area",
-            "115" : r"115_Fund Issuer Code",
-            "116" : r"116_Fund Issuer Code Type",
-            "117" : r"117_Fund Issuer Name",
-            "118" : r"118_Fund Issuer Sector",
-            "119" : r"119_Fund Issuer Group Code",
-            "120" : r"120_Fund Issuer Group Code Type",
-            "121" : r"121_Fund Issuer Group name",
-            "122" : r"122_Fund Issuer Country",
-            "123" : r"123_Fund CIC code",
-            "123a" : r"123a_Fund Custodian Country",
-            "124" : r"124_Duration",
-            "125" : r"125_Accrued Income (Security Denominated Currency)",
-            "126" : r"126_Accrued Income (Portfolio Denominated Currency)",
-            "127" : r"127_Bond Floor (convertible instrument only)",
-            "128" : r"128_Option premium (convertible instrument only)",
-            "129" : r"129_Valuation Yield",
-            "130" : r"130_Valuation Z-spread",
-            "131" : r"131_Underlying Asset Category",
-            "132" : r"132_Infrastructure_investment",
-            "133" : r"133_custodian_name",
-            "134" : r"134_type1_private_equity_portfolio_eligibility",
-            "135" : r"135_type1_private_equity_issuer_beta",
-            "137" : r"137_counterparty_sector",
-            "1000" : r"1000_TPT Version",
-        }
-    
-    def define_IN18(self):
-        self.IN18 = [
-            "29",
-            "31",
-            "32",
-            "33",
-            "34",
-            "39",
-            "41",
-            "42",
-            "43",
-            "44",
-            "45",
-            "46",
-            "47",
-            "48",
-            "49",
-            "A1",
-            "A2",
-            "A3",
-            "A5",
-            "A7",
-            "A8",
-            "A9",
-            "B1",
-            "B4",
-            "B5",
-            "C1",
-            "C4",
-            "C5",
-            "D1",
-            "D4",
-            "D5",
-        ]

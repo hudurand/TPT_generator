@@ -6,6 +6,7 @@ from pandas.testing import assert_series_equal, assert_index_equal
 
 from TPT_generator_python import TPT_Fetcher
 from TPT_generator_python import TPT_Generator
+from TPT_generator_python import Data_Bucket
 
 @pytest.fixture(scope="module",
     params=[
@@ -16,15 +17,15 @@ from TPT_generator_python import TPT_Generator
         pytest.param(("BIL", "LU1689730122", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Bonds Emerging Markets - I USD CAP_LU1689730122_20201231.xlsx"), id="LU1689730122_BIL"),
         pytest.param(("BIL", "LU1689730718", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Bonds EUR Corporate Investment Grade - I EUR CAP_LU1689730718_20201231.xlsx"), id="LU1689730718_BIL"),
         pytest.param(("BIL", "LU1689730809", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Bonds EUR Corporate Investment Grade - P EUR CAP_LU1689730809_20201231.xlsx"), id="LU1689730809_BIL"),
-        pytest.param(("BIL", "LU1689731286", "2020-12-30", "AO_TPT_V5.0_BIL Invest - Bonds EUR High Yield - I EUR CAP_LU1689731286_20201231.xlsx"), id="LU1689731286_BIL"),
-        pytest.param(("BIL", "LU1689731872", "2020-12-30", "AO_TPT_V5.0_BIL Invest - Bonds EUR Sovereign - I EUR CAP_LU1689731872_20201231.xlsx"), id="LU1689731872_BIL"),
-        pytest.param(("BIL", "LU1689731955", "2020-12-30", "AO_TPT_V5.0_BIL Invest - Bonds EUR Sovereign - P EUR CAP_LU1689731955_20201231.xlsx"), id="LU1689731955_BIL"),
+        #pytest.param(("BIL", "LU1689731286", "2020-12-30", "AO_TPT_V5.0_BIL Invest - Bonds EUR High Yield - I EUR CAP_LU1689731286_20201231.xlsx"), id="LU1689731286_BIL"),
+        #pytest.param(("BIL", "LU1689731872", "2020-12-30", "AO_TPT_V5.0_BIL Invest - Bonds EUR Sovereign - I EUR CAP_LU1689731872_20201231.xlsx"), id="LU1689731872_BIL"),
+        #pytest.param(("BIL", "LU1689731955", "2020-12-30", "AO_TPT_V5.0_BIL Invest - Bonds EUR Sovereign - P EUR CAP_LU1689731955_20201231.xlsx"), id="LU1689731955_BIL"),
         pytest.param(("BIL", "LU1565452015", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Bonds Renta Fund - P EUR CAP_LU1565452015_20201231.xlsx"), id="LU1565452015_BIL"),
         pytest.param(("BIL", "LU1808854985", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Bonds USD Corporate Investment Grade - I EUR Hedged CAP_LU1808854985_20201231.xlsx"), id="LU1808854985_BIL"),
         pytest.param(("BIL", "LU1689732334", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Bonds USD Corporate Investment Grade - I USD CAP_LU1689732334_20201231.xlsx"), id="LU1689732334_BIL"),
         pytest.param(("BIL", "LU1808855016", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Bonds USD High Yield - I EUR Hedged CAP_LU1808855016_20201231.xlsx"), id="LU1808855016_BIL"),
-        pytest.param(("BIL", "LU1689733498", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Bonds USD Sovereign - I USD CAP_LU1689733498_20201231.xlsx"), id="LU1689733498_BIL"),
-        pytest.param(("BIL", "LU1917566066", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Bonds USD Sovereign - P EUR Hedged Cap_LU1917566066_20201231.xlsx"), id="LU1917566066_BIL"),
+        #pytest.param(("BIL", "LU1689733498", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Bonds USD Sovereign - I USD CAP_LU1689733498_20201231.xlsx"), id="LU1689733498_BIL"),
+        #pytest.param(("BIL", "LU1917566066", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Bonds USD Sovereign - P EUR Hedged Cap_LU1917566066_20201231.xlsx"), id="LU1917566066_BIL"),
         pytest.param(("BIL", "LU1689734462", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Equities Emerging Markets - I USD CAP_LU1689734462_20201231.xlsx"), id="LU1689734462_BIL"),
         pytest.param(("BIL", "LU1689734546", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Equities Emerging Markets - P USD CAP_LU1689734546_20201231.xlsx"), id="LU1689734546_BIL"),
         pytest.param(("BIL", "LU1689735196", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Equities Europe - I EUR CAP_LU1689735196_20201231.xlsx"), id="LU1689735196_BIL"),
@@ -41,22 +42,22 @@ from TPT_generator_python import TPT_Generator
         pytest.param(("BIL", "LU1033871838", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Patrimonial Low - P USD Hedged CAP_LU1033871838_20201231.xlsx"), id="LU1033871838_BIL"),
         pytest.param(("BIL", "LU0108482372", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Patrimonial Medium - P EUR CAP_LU0108482372_20201231.xlsx"), id="LU0108482372_BIL"),
         pytest.param(("BIL", "LU1440060207", "2020-12-31", "AO_TPT_V5.0_BIL Invest - Patrimonial Medium - P USD Hedged CAP_LU1440060207_20201231.xlsx"), id="LU1440060207_BIL"),
-        pytest.param(("BIL", "LU0698523601", "2020-12-31", "AO_TPT_V5.0_Private One - Capital Balanced Fund - B EUR_LU0698523601_20201231.xlsx"), id="LU0698523601_BIL"),
-        pytest.param(("BIL", "LU2073848363", "2020-12-31", "AO_TPT_V5.0_Private One - Saint-Saens - EUR CAP_LU2073848363_20201231.xlsx"), id="LU2073848363_BIL"),
-        pytest.param(("Dynasty", "LU2133138276", "2020-12-31", "AO_TPT_V5.0_Dynasty Corporate Bonds 0 - 2.5 Class A_LU2133138276_20201231.xlsx"), id="LU2133138276_Dynasty"),
-        pytest.param(("Dynasty", "LU2133138433", "2020-12-31", "AO_TPT_V5.0_Dynasty Corporate Bonds 0 - 2.5 Class B_LU2133138433_20201231.xlsx"), id="LU2133138433_Dynasty"),
-        pytest.param(("Dynasty", "LU1280365476", "2020-12-31", "AO_TPT_V5.0_Dynasty Global Convertibles A CHF_LU1280365476_20201231.xlsx"), id="LU1280365476_Dynasty"),
-        pytest.param(("Dynasty", "LU1280365393", "2020-12-31", "AO_TPT_V5.0_Dynasty Global Convertibles A EUR_LU1280365393_20201231.xlsx"), id="LU1280365393_Dynasty"),
-        pytest.param(("Dynasty", "LU1280365559", "2020-12-31", "AO_TPT_V5.0_Dynasty Global Convertibles A USD_LU1280365559_20201231.xlsx"), id="LU1280365559_Dynasty"),
-        pytest.param(("Dynasty", "LU1483663818", "2020-12-31", "AO_TPT_V5.0_Dynasty Global Convertibles B CHF_LU1483663818_20201231.xlsx"), id="LU1483663818_Dynasty"),
-        pytest.param(("Dynasty", "LU1280365633", "2020-12-31", "AO_TPT_V5.0_Dynasty Global Convertibles B EUR_LU1280365633_20201231.xlsx"), id="LU1280365633_Dynasty"),
-        pytest.param(("Dynasty", "LU1840818220", "2020-12-31", "AO_TPT_V5.0_Dynasty Global Convertibles B GBP_LU1840818220_20201231.xlsx"), id="LU1840818220_Dynasty"),
-        pytest.param(("Dynasty", "LU1586705938", "2020-12-31", "AO_TPT_V5.0_Dynasty Global Convertibles B USD_LU1586705938_20201231.xlsx"), id="LU1586705938_Dynasty"),
-        pytest.param(("Dynasty", "LU1508332993", "2020-12-31", "AO_TPT_V5.0_Dynasty Global Convertibles D EUR_LU1508332993_20201231.xlsx"), id="LU1508332993_Dynasty"),
-        pytest.param(("Dynasty", "LU1073011352", "2020-12-31", "AO_TPT_V5.0_Dynasty High Yield 2026 A EUR_LU1073011352_20201231.xlsx"), id="LU1073011352_Dynasty"),
-        pytest.param(("Dynasty", "LU1586707801", "2020-12-31", "AO_TPT_V5.0_Dynasty High Yield 2026 A USD_LU1586707801_20201231.xlsx"), id="LU1586707801_Dynasty"),
-        pytest.param(("Dynasty", "LU1073013564", "2020-12-31", "AO_TPT_V5.0_Dynasty High Yield 2026 B EUR_LU1073013564_20201231.xlsx"), id="LU1073013564_Dynasty"),
-        pytest.param(("Dynasty", "LU1280365120", "2020-12-31", "AO_TPT_V5.0_Dynasty High Yield 2026 D EUR_LU1280365120_20201231.xlsx"), id="LU1280365120_Dynasty"),
+        #pytest.param(("BIL", "LU0698523601", "2020-12-31", "AO_TPT_V5.0_Private One - Capital Balanced Fund - B EUR_LU0698523601_20201231.xlsx"), id="LU0698523601_BIL"),
+        #pytest.param(("BIL", "LU2073848363", "2020-12-31", "AO_TPT_V5.0_Private One - Saint-Saens - EUR CAP_LU2073848363_20201231.xlsx"), id="LU2073848363_BIL"),
+        #pytest.param(("Dynasty", "LU2133138276", "2020-12-31", "AO_TPT_V5.0_Dynasty Corporate Bonds 0 - 2.5 Class A_LU2133138276_20201231.xlsx"), id="LU2133138276_Dynasty"),
+        #pytest.param(("Dynasty", "LU2133138433", "2020-12-31", "AO_TPT_V5.0_Dynasty Corporate Bonds 0 - 2.5 Class B_LU2133138433_20201231.xlsx"), id="LU2133138433_Dynasty"),
+        #pytest.param(("Dynasty", "LU1280365476", "2020-12-31", "AO_TPT_V5.0_Dynasty Global Convertibles A CHF_LU1280365476_20201231.xlsx"), id="LU1280365476_Dynasty"),
+        #pytest.param(("Dynasty", "LU1280365393", "2020-12-31", "AO_TPT_V5.0_Dynasty Global Convertibles A EUR_LU1280365393_20201231.xlsx"), id="LU1280365393_Dynasty"),
+        #pytest.param(("Dynasty", "LU1280365559", "2020-12-31", "AO_TPT_V5.0_Dynasty Global Convertibles A USD_LU1280365559_20201231.xlsx"), id="LU1280365559_Dynasty"),
+        #pytest.param(("Dynasty", "LU1483663818", "2020-12-31", "AO_TPT_V5.0_Dynasty Global Convertibles B CHF_LU1483663818_20201231.xlsx"), id="LU1483663818_Dynasty"),
+        #pytest.param(("Dynasty", "LU1280365633", "2020-12-31", "AO_TPT_V5.0_Dynasty Global Convertibles B EUR_LU1280365633_20201231.xlsx"), id="LU1280365633_Dynasty"),
+        #pytest.param(("Dynasty", "LU1840818220", "2020-12-31", "AO_TPT_V5.0_Dynasty Global Convertibles B GBP_LU1840818220_20201231.xlsx"), id="LU1840818220_Dynasty"),
+        #pytest.param(("Dynasty", "LU1586705938", "2020-12-31", "AO_TPT_V5.0_Dynasty Global Convertibles B USD_LU1586705938_20201231.xlsx"), id="LU1586705938_Dynasty"),
+        #pytest.param(("Dynasty", "LU1508332993", "2020-12-31", "AO_TPT_V5.0_Dynasty Global Convertibles D EUR_LU1508332993_20201231.xlsx"), id="LU1508332993_Dynasty"),
+        #pytest.param(("Dynasty", "LU1073011352", "2020-12-31", "AO_TPT_V5.0_Dynasty High Yield 2026 A EUR_LU1073011352_20201231.xlsx"), id="LU1073011352_Dynasty"),
+        #pytest.param(("Dynasty", "LU1586707801", "2020-12-31", "AO_TPT_V5.0_Dynasty High Yield 2026 A USD_LU1586707801_20201231.xlsx"), id="LU1586707801_Dynasty"),
+        #pytest.param(("Dynasty", "LU1073013564", "2020-12-31", "AO_TPT_V5.0_Dynasty High Yield 2026 B EUR_LU1073013564_20201231.xlsx"), id="LU1073013564_Dynasty"),
+        #pytest.param(("Dynasty", "LU1280365120", "2020-12-31", "AO_TPT_V5.0_Dynasty High Yield 2026 D EUR_LU1280365120_20201231.xlsx"), id="LU1280365120_Dynasty"),
         ])
 
 
@@ -135,9 +136,16 @@ def fetcher(params_fixt):
     CLIENT, ISIN, DATE, _ = params_fixt
     SOURCE_DIR = Path('./data')
     f = TPT_Fetcher(DATE, CLIENT, ISIN, SOURCE_DIR)
-    f.fetch()
 
     return f
+
+@pytest.fixture(scope="module")
+def data_bucket(fetcher, params_fixt):
+    CLIENT, _, _, _ = params_fixt
+    b = Data_Bucket(CLIENT, fetcher)
+    b.fetch()
+
+    return b
 
 @pytest.fixture(scope="module")
 def generator(params_fixt):
@@ -168,69 +176,70 @@ def test_fetcher_init(fetcher, params_fixt):
     assert fetcher.shareclass_isin == ISIN
     assert fetcher.date == DATE
     
-def test_get_shareclass_infos(fetcher, reference_TPT_report):
+def test_get_shareclass_infos(data_bucket, reference_TPT_report):
     """
     test execution of SQL request for shareclass infos
     """
 
-    shareclass_infos = fetcher.get_shareclass_infos()
+    shareclass_infos = data_bucket.get_shareclass_infos()
     
     assert shareclass_infos["code_isin"].iloc[0] == \
         reference_TPT_report["1_Portfolio identifying data"].iloc[0]
 
-def test_get_subfund_infos(fetcher, reference_TPT_report):
+def test_get_subfund_infos(data_bucket, reference_TPT_report):
     """
     test execution of SQL request for subfund infos
     """
 
-    subfund_infos = fetcher.get_subfund_infos()
+    subfund_infos = data_bucket.get_subfund_infos()
 
     assert subfund_infos["subfund_lei"].iloc[0] == \
         reference_TPT_report["115_Fund Issuer Code"].iloc[0]
 
-def test_get_fund_infos(fetcher, reference_TPT_report):
+def test_get_fund_infos(data_bucket, reference_TPT_report):
     """
     test execution of SQL request for fund infos
     """
 
-    fund_infos = fetcher.get_fund_infos()
+    fund_infos = data_bucket.get_fund_infos()
 
     assert fund_infos["fund_issuer_group_code"].iloc[0] == reference_TPT_report["119_Fund Issuer Group Code"].iloc[0]
 
-def test_get_shareclass_nav(fetcher, params_fixt):
+def test_get_shareclass_nav(data_bucket, params_fixt):
     """
     test execution of SQL request for shareclass nav
     """
     _, _, DATE, _ = params_fixt
-    shareclass_nav = fetcher.get_shareclass_nav()
+    shareclass_nav = data_bucket.get_shareclass_nav()
 
     assert shareclass_nav["nav_date"].iloc[0] == DATE
 
-def test_get_instruments(fetcher, reference_TPT_report):
+def test_get_instruments(data_bucket, reference_TPT_report):
     """
     test execution of SQL request for instruments associated to the shareclass
     """
     
-    instruments = fetcher.get_instruments()
+    instruments = data_bucket.get_instruments()
 
     assert len(instruments.index) == len(reference_TPT_report.index)
 
-def test_get_instruments_infos(fetcher, reference_TPT_report):
+def test_get_instruments_infos(data_bucket, reference_TPT_report):
     """
     test execution of SQL request for instruments infos
     """
-    instruments_infos = fetcher.get_instruments_infos()
-    prod = instruments_infos.set_index("14_Identification code of the financial instrument").sort_index()
+    instruments_infos = data_bucket.get_instruments_infos()
+    prod = instruments_infos.sort_index()
     ref = reference_TPT_report.set_index("14_Identification code of the financial instrument").sort_index()
     
+    print(ref)
     #diff1 = prod.loc[~(prod.index.isin(ref.index))]
     #print(diff1)
     #diff2 = ref.loc[~(ref.index.isin(prod.index))]
     #print(diff2)
-    diff1 = prod.loc[prod["17_Instrument name"] != ref["17_Instrument name"], "17_Instrument name"]
-    print(diff1)
-    diff2 = ref.loc[ref["17_Instrument name"] != prod["17_Instrument name"], "17_Instrument name"]
-    print(diff2)
+    #diff1 = prod.loc[prod["17_Instrument name"] != ref["17_Instrument name"], "17_Instrument name"]
+    #print(diff1)
+    #diff2 = ref.loc[ref["17_Instrument name"] != prod["17_Instrument name"], "17_Instrument name"]
+    #print(diff2)
     #print(prod.index)
     #print(ref.index)
 
