@@ -40,14 +40,6 @@ class TPT_Fetcher():
         self.bloomberg_infos = None
         self.portfolio_NAVs= None
 
-#    def fetch(self):
-#        self.fetch_shareclass_infos()
-#        self.fetch_subfund_infos()
-#        self.fetch_fund_infos()
-#        self.fetch_shareclass_nav()
-#        self.fetch_instruments()
-#        self.fetch_instruments_infos()
-
     def fetch_shareclass_infos(self, isin=None):
         if isin is None:
             isin = self.shareclass_isin
@@ -117,12 +109,12 @@ class TPT_Fetcher():
         return fund_infos
 
     def fetch_shareclass_nav(self, sc_id, sc_curr, sf_curr):
-
         nav = pd.read_sql_query('SELECT '
                                 'nav_date, '
                                 'share_price, '
                                 'outstanding_shares, '
-                                'shareclass_total_net_asset '
+                                'shareclass_total_net_asset, '
+                                'subfund_total_net_asset '
                                 'FROM intranet.dbo.nav '
                                 f"WHERE id_shareclass='{sc_id}' "
                                 f"AND nav_date='{self.date}' "
@@ -139,6 +131,16 @@ class TPT_Fetcher():
                                                                       f"AND nav_currency='{sf_curr}'",
                                                                       self.connector)    
         return nav
+
+    def fetch_subfund_shareclasses(self, id_subfund):
+        isins = pd.read_sql_query('SELECT '
+                                  'code_isin '
+                                  'FROM intranet.dbo.shareclass '
+                                  f"WHERE id_subfund='{id_subfund}'"
+                                  "AND supprime=0",
+                                  self.connector)
+
+        return isins["code_isin"].tolist()
 
     def fetch_instruments(self, subfund_id):
         infos = ', '.join(["asset_id_string",
@@ -234,20 +236,12 @@ class TPT_Fetcher():
         AODB_file_path = self.source_dir / AODB_file_name
         BBG_file_path = self.source_dir / BBG_file_name
         
-        #print("loading missing data from excel")
-        #start = timer()
-        #print("loading AODB cash sheet")
-        #start_AODB = timer()
         if not (self.source_dir / "AODB_CASH.feather").exists():
             self.AODB_CASH = pd.read_excel(AODB_file_path, sheet_name="Cash", skiprows=1)
             self.AODB_CASH.to_feather(self.source_dir / "AODB_CASH.feather")
         else:
             self.AODB_CASH = pd.read_feather(self.source_dir / "AODB_CASH.feather")
-        #end_AODB = timer()
-        #print(f"loaded AODB cash sheet in {end_AODB - start_AODB} seconds.")
 
-        #print("loading BBG hard copy sheet")
-        #start_BBG = timer()
         if not (self.source_dir / "BBG.feather").exists():
             BBG = pd.read_excel(BBG_file_path, sheet_name="Hard Copy", skiprows=2)
             BBG.replace({"-": np.nan}, inplace=True)
@@ -255,11 +249,7 @@ class TPT_Fetcher():
             BBG.to_feather(self.source_dir / "BBG.feather")
         else:
             BBG = pd.read_feather(self.source_dir / "BBG.feather")
-        #end_BBG = timer()
-        #print(f"loaded BBG hard copy sheet in {end_BBG - start_BBG} seconds.")
 
-        #print("loading ccy sheet")
-        #start_CCY = timer()
         if not (self.source_dir / "currency.feather").exists():
             ccy = pd.read_excel(BBG_file_path, sheet_name="ccy", usecols="E,F", names=["pair", "rate"])
             self.ccy = ccy.set_index("pair")["rate"]
@@ -267,9 +257,7 @@ class TPT_Fetcher():
             ccy_save.to_feather(self.source_dir / "currency.feather")
         else:
             self.ccy = pd.read_feather(self.source_dir / "currency.feather").set_index("pair", inplace=True)
-        #end = timer()
-        #print(f"loaded ccy sheet in {end - start_CCY} seconds.")
-        #print(f"loaded missing data in {end - start} seconds.")
+
         self.bloomberg_infos = BBG.loc[BBG["ISIN"].isin(id_list),
                                        ["ISIN",
                                         "YAS_RISK",
@@ -281,12 +269,13 @@ class TPT_Fetcher():
                                         "cv_model_cnvs_prem",
                                         "Bond floor"]]
         
-        self.bloomberg_infos.rename(columns={"YAS_RISK" : "92_Credit sensitivity",
-                                             "YAS_MOD_DUR" : "91_Modified duration to next option exercise date",
-                                             "CV_MODEL_DELTA_S" : "93_Sensitivity to underlying asset price (delta)",
-                                             "DUR_ADJ_MTY_MID" : "90_Modified Duration to maturity date",
-                                             "cv_model_gamma_v" : "94_Convexity / gamma for derivatives",
-                                             "CV_MODEL_vega" : "94b_Vega",
-                                             "cv_model_cnvs_prem" : "128_Option premium (convertible instrument only)",
-                                             "Bond floor" : "127_Bond Floor (convertible instrument only)"},
-                                            inplace=True)
+        self.bloomberg_infos.rename(
+            columns={"YAS_RISK" : "92_Credit sensitivity",
+                     "YAS_MOD_DUR" : "91_Modified duration to next option exercise date",
+                     "CV_MODEL_DELTA_S" : "93_Sensitivity to underlying asset price (delta)",
+                     "DUR_ADJ_MTY_MID" : "90_Modified Duration to maturity date",
+                     "cv_model_gamma_v" : "94_Convexity / gamma for derivatives",
+                     "CV_MODEL_vega" : "94b_Vega",
+                     "cv_model_cnvs_prem" : "128_Option premium (convertible instrument only)",
+                     "Bond floor" : "127_Bond Floor (convertible instrument only)"},
+            inplace=True)

@@ -44,7 +44,8 @@ class Data_Bucket():
             sc_id = self.get_shareclass_infos("id")
         else:
             sc_id = self.get_shareclass_infos(isin=isin, info="id")
-        
+        #print(isin)
+        #print(sc_id)
         sc_curr = self.get_shareclass_infos(isin=isin,
                                             info="shareclass_currency")
         sf_curr = self.get_subfund_infos("subfund_currency")
@@ -106,7 +107,10 @@ class Data_Bucket():
         # return all required info of all instruments associated
         # to the required shareclass or group
         if indicator == "all":
-            return self.instruments
+            if info is None:
+                return self.instruments
+            else:
+                return self.instruments[info]
         elif indicator is None:
             indicators = self.get_shareclass_infos(["shareclass",
                                                     "shareclass_id"]).tolist()
@@ -154,4 +158,10 @@ class Data_Bucket():
                                                   id_subfund=id_subfund)
 
         return isins
+
+    def get_subfund_shareclasses(self):
+        id_subfund = self.get_subfund_infos("id")
+
+        isins = self.fetcher.fetch_subfund_shareclasses(id_subfund)
         
+        return isins

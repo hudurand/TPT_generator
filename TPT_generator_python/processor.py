@@ -210,3 +210,58 @@ class Data_Processor():
         self.data_bucket.instruments_infos["94_Convexity / gamma for derivatives"].replace("-", np.nan, inplace=True)
         self.data_bucket.instruments_infos["94b_Vega"].replace("-", np.nan, inplace=True)
         
+    def get_distribution_matrix(self):
+        instruments = bucket.get_instruments(indicator="all", info=["hedge_indicator",
+                                                            "market_and_accrued_fund"])
+        shareclasses = self.data_bucket.get_subfund_shareclasses()
+        NAVs = pd.DataFrame(index=shareclasses, 
+                    columns=["shareclass_total_net_asset_sf_curr",
+                             "subfund_total_net_asset",
+                             "indicators"],
+                    dtype=object)
+
+        NAVs["indicators"] = NAVs["indicators"].astype(object)
+        for isin in shareclasses:
+            NAVs.loc[isin, "shareclass_total_net_asset_sf_curr"] = \
+                self.data_bucket.get_shareclass_nav(isin=isin, info="shareclass_total_net_asset_sf_curr")
+            NAVs.loc[isin, "subfund_total_net_asset"] = \
+                self.data_bucket.get_shareclass_nav(isin=isin, info="subfund_total_net_asset")
+            NAVs.at[isin, "indicators"] = \
+                [self.data_bucket.get_subfund_infos("subfund_indicator"),
+                 self.data_bucket.get_shareclass_infos(isin=isin, info="shareclass"),
+                 self.data_bucket.get_shareclass_infos(isin=isin, info="shareclass_id")]
+
+        BETAS = pd.DataFrame(1, index=instruments.index, columns=NAVs.index)
+        for isin in shareclasses:
+            BETAS[isin].where(
+                instruments["hedge_indicator"].isin(NAVs.loc[isin, "indicators"]),
+                0,
+                inplace=True)
+        BETAS.sort_index(inplace=True)
+        BETAS["fund"] = 1
+        for isin in shareclasses:
+            BETAS["fund"] = BETAS["fund"] * BETAS[isin]
+
+        SK = pd.DataFrame(0, index=instruments.index, columns=NAVs.index)
+        for isin in shareclasses:
+            SK[isin].where(
+                ~(instruments["hedge_indicator"].isin(NAVs.loc[isin, "indicators"])),
+                NAVs.loc[isin, "shareclass_total_net_asset_sf_curr"].astype('float64'),
+                inplace=True)
+        SK.sort_index(inplace=True)
+
+        D = pd.DataFrame(0, index=instruments.index, columns=NAVs.index)
+        for isin in shareclasses:
+            D.loc[BETAS["fund"]==0, isin] = \
+                instruments.loc[BETAS["fund"]==0, "market_and_accrued_fund"] \
+                * SK.loc[BETAS["fund"]==0, isin] / SK.loc[BETAS["fund"]==0].sum(axis=1)
+
+        for isin in shareclasses:
+            D.loc[BETAS["fund"]==1, isin] = \
+                instruments.loc[BETAS["fund"]==1, "market_and_accrued_fund"] \
+                * (SK.loc[BETAS["fund"]==1, isin] \
+                   - D.loc[((BETAS[isin]==1) & (BETAS["fund"]==0)), isin].sum()) \
+                / (SK.loc[BETAS["fund"]==1].sum(axis=1) \
+                   - instruments.loc[BETAS["fund"]==0, "market_and_accrued_fund"].sum())
+
+        return D

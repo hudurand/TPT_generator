@@ -23,13 +23,11 @@ class Cash_Flow():
         self.data["7_Reporting date"] = pd.to_datetime(self.data["7_Reporting date"])
         self.data["43_Call / put date"] = pd.to_datetime(self.data["43_Call / put date"])
         self.data["39_Maturity date"] = pd.to_datetime(self.data["39_Maturity date"], errors='coerce')
-        #self.data["39_Maturity date"].fillna(self.data["7_Reporting date"] + pd.offsets.DateOffset(years=40))
 
         self.cash_flows_dict = {instrument[0] : self.compute_single(instrument[1]) for instrument in self.data.iterrows()}
         self.actualized = True
 
     def compute_single(self, instrument):
-        #print(instrument)
         frequency = instrument["38_Coupon payment frequency"]
         coupon = instrument["33_Coupon rate"]
         notional = instrument["quantity_nominal"]
@@ -70,9 +68,9 @@ class Cash_Flow():
             CF = pd.DataFrame(index=dates, columns=["rfr", "up", "down"])
             if frequency == 0:
                 if not pd.isnull(optdate) and matdate != optdate:
-                    CF["rfr"] = coupon / 100 * notional + notional * strike /100
-                    CF["up"] = coupon / 100 * notional + notional * strike /100
-                    CF["down"] = coupon / 100 * notional + notional * strike /100
+                    CF["rfr"] = coupon / 100 * notional + notional * strike / 100
+                    CF["up"] = coupon / 100 * notional + notional * strike / 100
+                    CF["down"] = coupon / 100 * notional + notional * strike / 100
                 else:
                     CF["rfr"] = coupon / 100 * notional + notional
                     CF["up"] = coupon / 100 * notional + notional
@@ -88,17 +86,29 @@ class Cash_Flow():
                         while d1 > optdate:
                             d2 = d1
                             d1 = d2 + offset
-                        CF.loc[optdate, "rfr"] = (coupon / frequency) / 100 * notional * ((optdate - d1) / (d2 - d1)) + notional * strike / 100
-                        CF.loc[optdate, "up"] = (coupon / frequency) / 100 * notional * ((optdate - d1) / (d2 - d1)) + notional * strike / 100
-                        CF.loc[optdate, "down"] = (coupon / frequency) / 100 * notional * ((optdate - d1) / (d2 - d1)) + notional * strike / 100
+                        CF.loc[optdate, "rfr"] = (coupon / frequency) \
+                            / 100 * notional * ((optdate - d1) / (d2 - d1)) \
+                            + notional * strike / 100
+                        CF.loc[optdate, "up"] = (coupon / frequency) \
+                            / 100 * notional * ((optdate - d1) / (d2 - d1)) \
+                            + notional * strike / 100
+                        CF.loc[optdate, "down"] = (coupon / frequency) \
+                            / 100 * notional * ((optdate - d1) / (d2 - d1)) \
+                            + notional * strike / 100
                     else:
-                        CF.loc[optdate, "rfr"] = (coupon / frequency) / 100 * notional + notional * strike / 100
-                        CF.loc[optdate, "up"] = (coupon / frequency) / 100 * notional + notional * strike / 100
-                        CF.loc[optdate, "down"] = (coupon / frequency) / 100 * notional + notional * strike / 100
+                        CF.loc[optdate, "rfr"] = (coupon / frequency) \
+                            / 100 * notional + notional * strike / 100
+                        CF.loc[optdate, "up"] = (coupon / frequency) \
+                            / 100 * notional + notional * strike / 100
+                        CF.loc[optdate, "down"] = (coupon / frequency) \
+                            / 100 * notional + notional * strike / 100
                 else:
-                    CF.loc[matdate, "rfr"] = (coupon / frequency) / 100 * notional + notional
-                    CF.loc[matdate, "up"] = (coupon / frequency) / 100 * notional + notional
-                    CF.loc[matdate, "down"] = (coupon / frequency) / 100 * notional + notional
+                    CF.loc[matdate, "rfr"] = (coupon / frequency) \
+                        / 100 * notional + notional
+                    CF.loc[matdate, "up"] = (coupon / frequency) \
+                        / 100 * notional + notional
+                    CF.loc[matdate, "down"] = (coupon / frequency) \
+                        / 100 * notional + notional
                 
             CF["rfr"] = CF["rfr"] * self.RFR.loc[CF.index, currency]
             CF["up"] = CF["up"] * self.UP.loc[CF.index, currency]
@@ -118,65 +128,46 @@ class Cash_Flow():
         UP_feather = f"UP_{self.date}.feather"
         DOWN_feather = f"DOWN_{self.date}.feather"
         cols = "A,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U"
-        col_names = ["dates", "EUR", "DKK", "HUF", "NOK", "PLN", "RUB", "SEK", "CHF", "GBP", "AUD", "CAD", "HKD", "INR", "JPY", "MYR", "SGD", "KRW", "TWD", "USD"]
+        col_names = ["dates", "EUR", "DKK", "HUF", "NOK", "PLN", "RUB", "SEK",
+                     "CHF", "GBP", "AUD", "CAD", "HKD", "INR", "JPY", "MYR",
+                     "SGD", "KRW", "TWD", "USD"]
         
         if not (root_path / RFR_feather).exists():
-            #print("loading rfr actualisation rates from excel")
-            #start = timer()
-            self.RFR = pd.read_excel(root_path / CF_file_name, sheet_name="rfr", skiprows=9, index_col=0, names=col_names, usecols=cols)
-            #end = timer()
-            #print(end - start)
-            #print("saving rfr actualisation rates to feather")
+            self.RFR = pd.read_excel(root_path / CF_file_name,
+                                     sheet_name="rfr",
+                                     skiprows=9,
+                                     index_col=0,
+                                     names=col_names,
+                                     usecols=cols)
             RFR_save = self.RFR.reset_index()
-            #start = timer()
             RFR_save.to_feather(root_path / RFR_feather)
-            #end = timer()
-            #print(end - start)
         else:
-            #print("loading rfr actualisation from feather")
-            #start = timer()
             self.RFR = pd.read_feather(root_path / RFR_feather)
-            #end = timer()
-            #print(end - start)
             self.RFR.set_index("dates", inplace=True)
 
         if not (root_path / UP_feather).exists():
-            #print("loading up shocked actualisation rates from excel")
-            #start = timer()
-            self.UP = pd.read_excel(root_path / CF_file_name, sheet_name="up", skiprows=9, index_col=0, names=col_names, usecols=cols)
-            #end = timer()
-            #print(end - start)
-            #print("saving up shocked actualisation rates to feather")
+            self.UP = pd.read_excel(root_path / CF_file_name,
+                                    sheet_name="up",
+                                    skiprows=9,
+                                    index_col=0,
+                                    names=col_names,
+                                    usecols=cols)
             UP_save = self.UP.reset_index()
-            #start = timer()
             UP_save.to_feather(root_path / UP_feather)
-            #end = timer()
-            #print(end - start)
         else:
-            #print("loading up shocked actualisation from feather")
-            #start = timer()
             self.UP = pd.read_feather(root_path / UP_feather)
-            #end = timer()
-            #print(end - start)
             self.UP.set_index("dates", inplace=True)
         if not (root_path / DOWN_feather).exists():
-            #print("loading down shocked actualisation rates from excel")
-            #start = timer()
-            self.DOWN = pd.read_excel(root_path / CF_file_name, sheet_name="down", skiprows=9, index_col=0, names=col_names, usecols=cols)
-            #end = timer()
-            #print(end - start)
-            #print("saving down shocked actualisation rates to feather")
+            self.DOWN = pd.read_excel(root_path / CF_file_name,
+                                      sheet_name="down",
+                                      skiprows=9,
+                                      index_col=0,
+                                      names=col_names,
+                                      usecols=cols)
             DOWN_save = self.DOWN.reset_index()
-            #start = timer()
             DOWN_save.to_feather(root_path / DOWN_feather)
-            #end = timer()
-            #print(end - start)
         else:
-            #print("loading down shocked actualisation from feather")
-            #start = timer()
             self.DOWN = pd.read_feather(root_path / DOWN_feather)
-            #end = timer()
-            #print(end - start)
             self.DOWN.set_index("dates", inplace=True)
 
     def __getitem__(self, key):
