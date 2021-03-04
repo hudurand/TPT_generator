@@ -1,5 +1,5 @@
 import pandas as pd
-from .processor import loc_sp_instruments, set_sp_instrument_infos
+from .processor import loc_sp_instruments
 from .processor import Data_Processor
 from .constants import DB_INSTRUMENTS_INFOS_MAP
 
@@ -19,6 +19,7 @@ class Data_Bucket():
         self.fund_infos = None
         self.instruments = None
         self.instruments_infos = None
+        self.distribution_matrix = None
     
     def fetch(self):
         self.get_shareclass_infos()
@@ -130,21 +131,8 @@ class Data_Bucket():
             instrument_id_list = self.get_instruments().index
             db_instruments_infos = \
                 self.fetcher.fetch_db_instruments_infos(instrument_id_list)
-            #TODO: implement fetch_sp_instrument_infos
-            CASH, FET, OTHER = loc_sp_instruments(self.client,
-                                                  self.instruments)
-            ALL_SP = CASH + FET + OTHER
-            columns = DB_INSTRUMENTS_INFOS_MAP.values()
-            sp_instruments_infos = pd.DataFrame(index=ALL_SP,
-                                                columns=columns)
 
-            set_sp_instrument_infos(sp_instruments_infos,
-                                    self.instruments,
-                                    CASH,
-                                    FET,
-                                    OTHER,
-                                    self.fetcher.AODB_CASH,
-                                    self.client)
+            sp_instruments_infos = self.processor.set_sp_instrument_infos()
 
             self.instruments_infos = sp_instruments_infos.append(db_instruments_infos)
             self.processor.clean_instruments_infos()
@@ -165,3 +153,21 @@ class Data_Bucket():
         isins = self.fetcher.fetch_subfund_shareclasses(id_subfund)
         
         return isins
+
+    def get_distribution_vector(self, isin):
+        if self.distribution_matrix is None:
+            self.distribution_matrix = self.processor.compute_distribution_matrix()
+
+        return self.distribution_matrix[isin]
+    
+    def get_valuation_weight_vector(self, isin):
+        if self.distribution_matrix is None:
+            self.distribution_matrix = self.processor.compute_distribution_matrix()
+
+        return self.distribution_matrix[isin] / self.get_shareclass_nav("shareclass_total_net_asset_sf_curr")
+
+    def get_distribution_weight(self, isin):
+        if self.distribution_matrix is None:
+            self.distribution_matrix = self.processor.compute_distribution_matrix()
+
+        return self.distribution_matrix[isin] / self.get_instruments("market_and_accrued_fund")

@@ -93,17 +93,23 @@ class TPT_Fetcher():
         #'fund_issuer_country, '
         #'fund_custodian_country, '
         #'custodian_name '
+        
+
         fund_infos = pd.read_sql_query('SELECT '
-                                            'fund_name, '
-                                            'fund_issuer_group_code, '
-                                            'fund_country, '
-                                            'depositary_lei, '
-                                            'depositary_country '
-                                            'FROM intranet.dbo.fund as f '
-                                            'INNER JOIN intranet.dbo.depositary as d '
-                                            'ON f.id_depositary=d.id '
-                                            f"WHERE f.id='{fund_id}'", 
-                                            self.connector)
+                                       'fund_name, '
+                                       'fund_issuer_group_code, '
+                                       'fund_country, '
+                                       'depositary_name, '
+                                       'depositary_lei, '
+                                       'depositary_group_name, '
+                                       'depositary_group_lei, '
+                                       'depositary_country, '
+                                       'depositary_nace '
+                                       'FROM intranet.dbo.fund as f '
+                                       'INNER JOIN intranet.dbo.depositary as d '
+                                       'ON f.id_depositary=d.id '
+                                       f"WHERE f.id='{fund_id}'", 
+                                       self.connector)
         fund_infos.rename(columns={"depositary_lei":"fund_issuer_code"}, inplace=True)
         
         return fund_infos
@@ -198,9 +204,11 @@ class TPT_Fetcher():
 
         self.instruments["accrued_fund"].fillna(0, inplace=True)
         self.instruments["accrued_asset"].fillna(0, inplace=True)
-        self.instruments["market_fund"] = self.instruments["market_and_accrued_fund"] - self.instruments["accrued_fund"]
-        self.instruments["market_asset"] = self.instruments["market_and_accrued_asset"] - self.instruments["accrued_asset"]
-        #self.instruments["market_and_accrued_asset"] = self.instruments["market_asset"] + self.instruments["accrued_asset"]
+        if self.client == "BIL":
+            self.instruments["market_fund"] = self.instruments["market_and_accrued_fund"] - self.instruments["accrued_fund"]
+            self.instruments["market_asset"] = self.instruments["market_and_accrued_asset"] - self.instruments["accrued_asset"]
+        elif self.client == "Dynasty":
+            self.instruments["market_and_accrued_asset"] = self.instruments["market_asset"] + self.instruments["accrued_asset"]
         
         return self.instruments
 

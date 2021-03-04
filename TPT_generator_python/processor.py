@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from .constants import DB_INSTRUMENTS_INFOS_MAP
 
 def loc_sp_instruments(client, instruments):
     if client == "BIL":
@@ -150,35 +151,13 @@ class Data_Processor():
         self.fetcher = fetcher
         self.data_bucket = data_bucket
 
-    #TODO: rename
-    #TODO: replace by matrix computation
-    def compute_sp_distribution(self, isin, dedicated_group):
-        # sum the value of cash instruments in shareclass
-        #TODO: rename
-        dedicated_value = self.data_bucket.get_instruments(
-            indicator=[dedicated_group], info="market_and_accrued_fund").sum()
-
-        isins = self.data_bucket.get_isins_in_group(dedicated_group)
-
-        NAV = self.data_bucket.get_shareclass_nav(info="shareclass_total_net_asset_sf_curr",
-                                      isin=isin)
-        TOTAL_NAV = 0
-        
-        for i in isins:
-            TOTAL_NAV += self.data_bucket.get_shareclass_nav(info="shareclass_total_net_asset_sf_curr",
-                                                 isin=i)
-        #print("included_cash", included_cash)
-        #print("NAV ", NAV)
-        #print("TOTAL NAV ", TOTAL_NAV)
-        return  TOTAL_NAV, NAV * (1 - dedicated_value / TOTAL_NAV)
-        #NAV - included_cash * (NAV / TOTAL_NAV)
-    
     def compute_QN(self):
-        price = self.data_bucket.get_instruments("price_market")
-        amount = self.data_bucket.get_instruments("quantity_nominal")
-        value = self.data_bucket.get_instruments("market_asset")
+        if "QN" not in self.data_bucket.instruments.columns:
+            price = self.data_bucket.get_instruments("price_market")
+            amount = self.data_bucket.get_instruments("quantity_nominal")
+            value = self.data_bucket.get_instruments("market_asset")
 
-        self.data_bucket.instruments["QN"] = price * amount / value 
+            self.data_bucket.instruments["QN"] = price * amount / value 
 
     def clean_instruments_infos(self):
         self.data_bucket.instruments_infos.loc[:,
@@ -210,9 +189,9 @@ class Data_Processor():
         self.data_bucket.instruments_infos["94_Convexity / gamma for derivatives"].replace("-", np.nan, inplace=True)
         self.data_bucket.instruments_infos["94b_Vega"].replace("-", np.nan, inplace=True)
         
-    def get_distribution_matrix(self):
-        instruments = bucket.get_instruments(indicator="all", info=["hedge_indicator",
-                                                            "market_and_accrued_fund"])
+    def compute_distribution_matrix(self):
+        instruments = self.data_bucket.get_instruments(indicator="all", info=["hedge_indicator",
+                                                                              "market_and_accrued_fund"])
         shareclasses = self.data_bucket.get_subfund_shareclasses()
         NAVs = pd.DataFrame(index=shareclasses, 
                     columns=["shareclass_total_net_asset_sf_curr",
@@ -265,3 +244,47 @@ class Data_Processor():
                    - instruments.loc[BETAS["fund"]==0, "market_and_accrued_fund"].sum())
 
         return D
+
+    def set_sp_instrument_infos(self):
+        
+        columns = DB_INSTRUMENTS_INFOS_MAP.values()
+        instruments = self.data_bucket.get_instruments()
+        cash_index, fet_index, other_index = loc_sp_instruments(self.data_bucket.client, 
+                                                                instruments)
+        sp_index = cash_index + fet_index + other_index
+
+        sp_instruments_infos = pd.DataFrame(index=sp_index,
+                                            columns=columns)
+        sp_instruments_infos.loc[cash_index, 
+            "12_CIC code of the instrument"] = "XT72"
+        sp_instruments_infos.loc[fet_index, 
+            "12_CIC code of the instrument"] = "XLE2"
+        sp_instruments_infos.loc[other_index, 
+            "12_CIC code of the instrument"] = "XT79"
+        sp_instruments_infos.loc[:, 
+            "13_Economic zone of the quotation place"] = 0
+        sp_instruments_infos.loc[:, 
+            "15_Type of identification code for the instrument"] = 99
+        sp_instruments_infos.loc[:, 
+            "21_Quotation currency (A)"].update(
+                instruments.loc[sp_index, "asset_currency"])
+        sp_instruments_infos.loc[fet_index, 
+            "65_Hedging Rolling"] = "Y"
+        sp_instruments_infos.loc[fet_index, 
+            "70_Name of the underlying asset"] = instruments.loc[
+                fet_index].apply(lambda x: 
+                    write_underlying_name(instruments, x), axis=1)
+        sp_instruments_infos.loc[fet_index, 
+            "71_Quotation currency of the underlying asset (C)"] = \
+                instruments.loc[fet_index, "asset_currency"]
+        
+        sp_instruments_infos.loc[:, "46_Issuer name"] = self.data_bucket.get_fund_infos("depositary_name")
+        sp_instruments_infos.loc[:, "47_Issuer identification code"] = self.data_bucket.get_fund_infos("fund_issuer_code")
+        sp_instruments_infos.loc[:, "49_Name of the group of the issuer"] = self.data_bucket.get_fund_infos("depositary_group_name")
+        sp_instruments_infos.loc[:, "50_Identification of the group"] = self.data_bucket.get_fund_infos("depositary_group_lei")
+        #sp_instruments_infos.loc[:, "51_Type of identification code for issuer group"] = self.data_bucket.get_fund_infos("")
+        sp_instruments_infos.loc[:, "52_Issuer country"] = self.data_bucket.get_fund_infos("depositary_country")
+        #sp_instruments_infos.loc[:, "53_Issuer economic area"] = self.data_bucket.get_fund_infos("")
+        sp_instruments_infos.loc[:, "54_Economic sector"] = self.data_bucket.get_fund_infos("depositary_nace")
+        
+        return sp_instruments_infos

@@ -20,7 +20,7 @@ if __name__ == "__main__":
     #print(group_id)
     instruments = bucket.get_instruments()
     #print(instruments)
-    infos = bucket.get_instruments_infos()
+    infos = bucket.get_shareclass_nav(isin="LU1808855289")
     print(infos)
 
     #dedicated_group = f.get_isins_in_group(group_id)
