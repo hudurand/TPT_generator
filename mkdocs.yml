@@ -1,0 +1,18 @@
+site_name: TPT generator doc
+nav:
+    - Overview: index.md
+    - Design: design.md
+    - Methodology: methodology.md
+    - Reference: reference.md
+theme:
+    name: "material"
+plugins:
+    - search
+    - mkdocstrings
+extra_css:
+    - stylesheets/extra.css
+markdown_extensions:
+    - admonition
+    - pymdownx.emoji:
+        emoji_index: !!python/name:materialx.emoji.twemoji
+        emoji_generator: !!python/name:materialx.emoji.to_svg

@@ -16,8 +16,42 @@ from .constants import IN18, FIELDS
 
 class TPT_Generator():
     """
-    class to generate a TPT report for a shareclass or all shareclass of a
-    client at a given date
+    Class to generate a TPT report for a shareclass or all shareclass of a 
+    subfund at a given date.
+
+    It proceed by shareclass, generating the report for the shareclass 
+    identified by the isin code held in ``self.shareclass_isin``.
+    
+    It relies on the Data_Bucket object to feed it the data required to fill
+    the report and perform minor operation on the data to fill the columns 
+    correctly. more complex computations are handled by the ``cash_flows``, 
+    ``scr_module`` and ``processor`` modules.
+
+    Args:
+        date (pd.DateTime): reporting date
+        client (str): client the report must be generated for
+        shareclass_isin (str): isin code of the shareclass the report must \
+            be generated for
+
+    The TPT_report can be divided into a number of sections:
+
+        - columns that are shareclass specific and will hold the same 
+        information in all rows. This include the shareclass' related
+        informations, as well as the subfund's, fund's and client's related 
+        informations.
+            - columns 1-11: shareclass related inforamtions.
+            - columns 114-118: subfund related informations.
+            - columns 119-124: fund related informations.
+        
+        - fixed instruments specific columns which will hold informations that
+        depends on the instruments intrinsecs properties.
+            - columns: 12-17; 20; 21; 32-95; 
+
+        - varying instruments specific columns which will hold informations that
+        depends on the specific investment made by the shareclass.
+
+        - SCR columns which are computed by a dedicated module.
+            - columns: 97-105b
     """
 
     def __init__(self,
@@ -28,7 +62,7 @@ class TPT_Generator():
                  output_dir=None,
                  sym_adj=0):
         """
-        intialise report-specific attributes and fetcher
+        Initialise report-specific attributes helper objects.
         """
         self.date = date
         self.client = client
@@ -56,18 +90,24 @@ class TPT_Generator():
         self.create_empty_report()
 
     def generate(self):
+        """
+        Generate the report by calling the filling methods for all columns.
+        """
         for field in self.fields:
             #print(f"fill_column_{field}...")
             getattr(self, f"fill_column_{field}")()
 
     def create_empty_report(self):
         """
-        create an empty TPT report to fill
+        Create an empty pandas dataframe to hold the TPT report to generate.
         """
         Ncol = len(self.data_bucket.get_instruments().index)
         self.TPT_report = pd.DataFrame(index=range(Ncol), columns=self.fields.values(), dtype=object)
     
     def output_excel(self):
+        """
+        Saves the generated TPT report to an excel file using the AO template.
+        """
         #root_path = Path('./data')
         template_file_name = 'AO_TPT_V5.0_Template.xlsx'
         output_file_name = f"AO_TPT_V5.0_{self.client}_{self.shareclass_isin}_{self.date}.xlsx"
@@ -100,12 +140,18 @@ class TPT_Generator():
         template.save(self.output_dir / output_file_name)
 
     def check_required(self, required_fields):
+        """
+        Check if the fields given as input are filled and fill them if necessary.
+        """
         for field in required_fields:
             if self.TPT_report[self.fields[field]].isnull().values.all():
                 #print(f"fill_column_{field}")
                 getattr(self, f"fill_column_{field}")()
 
     def fill_instrument_info(self, info):
+        """
+        Abstracting class to fill fixed instruments speficific informations.
+        """
         self.check_required(["14"])
 
         column = self.data_bucket.get_instruments_infos(info)
@@ -562,12 +608,12 @@ class TPT_Generator():
     def fill_column_94(self):
         self.fill_instrument_info(self.fields["94"])
 
-    def fill_column_95(self):
-        pass
-    
     def fill_column_94b(self):
         self.fill_instrument_info(self.fields["94b"])
 
+    def fill_column_95(self):
+        pass
+    
     def fill_column_97(self):
         def compute_97(row):
             if self.TPT_report.loc[row.name, self.fields["12"]][2] in ["1", "2", "5"]:

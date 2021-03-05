@@ -18,10 +18,6 @@ class TPT_Fetcher():
                  client=None,
                  shareclass_isin=None,
                  source_dir=None):
-
-        """
-        initialise db connector and shareclass-specific infos
-        """
         self.connector = pyodbc.connect('driver={SQL Server};'
                                         'Server=DESKTOP-RGN6M86;'
                                         'Database=intranet;'

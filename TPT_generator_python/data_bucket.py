@@ -4,6 +4,14 @@ from .processor import Data_Processor
 from .constants import DB_INSTRUMENTS_INFOS_MAP
 
 class Data_Bucket():
+    """
+    Container class to to hold the data coming from the database as well as
+    resulting preprocessing in a semi-structured way and feed them to the 
+    generator for generation of the report.
+
+    It relies on a fetcher object to get the data from the database and a 
+    processor object to apply transformations to the data.
+    """
 
     def __init__(self,
                  client,
@@ -22,14 +30,27 @@ class Data_Bucket():
         self.distribution_matrix = None
     
     def fetch(self):
+        """
+        Run all data-acquiring methods at once and each of them will in turn
+        call their corresponding fetching methods to get data from database.
+        """
         self.get_shareclass_infos()
         self.get_shareclass_nav()
         self.get_subfund_infos()
-        self.get_fund_infos
+        self.get_fund_infos()
         self.get_instruments()
         self.get_instruments_infos()
 
     def get_shareclass_infos(self, info=None, isin=None):
+        """
+        Feed shareclass related informations.
+        Args:
+            info ([str, list?]): name of the information to return, \
+                (name used in database).
+            isin (str): isin code of the shareclass, if none the isin stored as\
+                attribute of the fetcher is used.
+        """
+
         if isin is None and self.shareclass_infos is None:
             self.shareclass_infos = self.fetcher.fetch_shareclass_infos()
 
@@ -100,8 +121,6 @@ class Data_Bucket():
         if self.instruments is None:
             self.instruments = self.fetcher.fetch_instruments(id_subfund)
 
-        # TODO: move to processor?
-        # how?
         self.instruments["hedge_indicator"].fillna(
             self.get_subfund_infos("subfund_indicator"), inplace=True)
 
