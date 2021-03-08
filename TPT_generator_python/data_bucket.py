@@ -5,7 +5,7 @@ from .constants import DB_INSTRUMENTS_INFOS_MAP
 
 class Data_Bucket():
     """
-    Container class to to hold the data coming from the database as well as
+    Container class to hold the data coming from the database as well as
     resulting preprocessing in a semi-structured way and feed them to the 
     generator for generation of the report.
 

@@ -1,3 +1,4 @@
+![logo](5d07dc3917bf6193f2e37f9b_logo-AO-long.svg)
 # Welcome to AlphaOmega reporting documentation
 
 This documentation details the implementation and methodology adopted to generate each reports.

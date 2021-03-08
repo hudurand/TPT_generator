@@ -16,7 +16,7 @@ from .constants import IN18, FIELDS
 
 class TPT_Generator():
     """
-    Class to generate a TPT report for a shareclass or all shareclass of a 
+    Factory object to generate a TPT report for a shareclass or all shareclass of a 
     subfund at a given date.
 
     It proceed by shareclass, generating the report for the shareclass 

@@ -6,6 +6,8 @@ nav:
     - Reference: reference.md
 theme:
     name: "material"
+    logo: "5d07dc3917bf6193f2e37f9b_logo-AO.svg"
+    favicon: "5d0b30400369a4cb0ed33ef4_AO-favicon.png"
 plugins:
     - search
     - mkdocstrings
