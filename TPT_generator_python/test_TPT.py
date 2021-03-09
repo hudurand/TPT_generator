@@ -128,22 +128,23 @@ def reference_TPT_report(params_fixt):
     
     return report
 
-@pytest.fixture(scope="module")
-def fetcher(params_fixt):    
-    """
-    Instanciate the database fetcher object
-    """
+#@pytest.fixture(scope="module")
+#def fetcher(params_fixt):    
+#    """
+#    Instanciate the database fetcher object
+#    """
+#
+#    CLIENT, ISIN, DATE, _ = params_fixt
+#    
+#    f = TPT_Fetcher(DATE, CLIENT, ISIN, SOURCE_DIR)
+#
+#    return f
 
+@pytest.fixture(scope="module")
+def data_bucket(params_fixt):
     CLIENT, ISIN, DATE, _ = params_fixt
     SOURCE_DIR = Path('./data')
-    f = TPT_Fetcher(DATE, CLIENT, ISIN, SOURCE_DIR)
-
-    return f
-
-@pytest.fixture(scope="module")
-def data_bucket(fetcher, params_fixt):
-    CLIENT, _, _, _ = params_fixt
-    b = Data_Bucket(CLIENT, fetcher)
+    b = Data_Bucket(DATE, CLIENT, ISIN, SOURCE_DIR)
     b.fetch()
 
     return b
@@ -166,16 +167,16 @@ def generator(params_fixt):
     
     return g
 
-def test_fetcher_init(fetcher, params_fixt):
+def test_bucket_init(data_bucket, params_fixt):
     """
     test initialisation of fetcher object
     """
 
     CLIENT, ISIN, DATE, _ = params_fixt
     
-    assert fetcher.client == CLIENT
-    assert fetcher.shareclass_isin == ISIN
-    assert fetcher.date == DATE
+    assert data_bucket.client == CLIENT
+    assert data_bucket.shareclass_isin == ISIN
+    assert data_bucket.date == DATE
     
 def test_get_shareclass_infos(data_bucket, reference_TPT_report):
     """

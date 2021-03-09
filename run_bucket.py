@@ -4,13 +4,13 @@ from pathlib import Path
 if __name__ == "__main__":
 
     DATE = "2020-12-31"
-    CLIENT = "Dynasty"
-    ISIN = "LU1280365476"
+    CLIENT = "BIL"
+    ISIN = "LU1689732417"
     SOURCE_DIR = Path("./data")
 
-    f = TPT_Fetcher(DATE, CLIENT, ISIN, SOURCE_DIR)
-    bucket = Data_Bucket(CLIENT, f)
+    bucket = Data_Bucket(DATE, CLIENT, ISIN, SOURCE_DIR)
 
+    bucket.fetch()
 #    print(f.get_shareclass_infos())
 #    print(f.get_subfund_infos())
 #    print(f.get_fund_infos())
@@ -18,10 +18,10 @@ if __name__ == "__main__":
 #    print(f.get_instruments_infos())
     #group_id = f.get_shareclass_infos("shareclass")
     #print(group_id)
-    instruments = bucket.get_instruments()
+    #instruments = bucket.get_instruments()
     #print(instruments)
-    infos = bucket.get_shareclass_nav(isin="LU1808855289")
-    print(infos)
+    #infos = bucket.get_shareclass_nav(isin="LU1808855289")
+    #print(infos)
 
     #dedicated_group = f.get_isins_in_group(group_id)
     #print(dedicated_group)

@@ -1,7 +1,9 @@
 import pandas as pd
-from .processor import loc_sp_instruments
+import numpy as np
+from .db_fetcher import TPT_Fetcher
 from .processor import Data_Processor
-from .constants import DB_INSTRUMENTS_INFOS_MAP
+from .scr_module import SCR_Module
+from .constants import DB_INSTRUMENTS_INFOS_MAP, FIELDS
 
 class Data_Bucket():
     """
@@ -14,13 +16,20 @@ class Data_Bucket():
     """
 
     def __init__(self,
+                 date,
                  client,
-                 fetcher):
+                 shareclass_isin,
+                 source_dir):
 
+        self.date = date
         self.client = client
-        self.fetcher = fetcher
-        self.processor = Data_Processor(self,
-                                        self.fetcher)
+        self.shareclass_isin = shareclass_isin
+
+        self.fetcher = TPT_Fetcher(self.date,
+                                   self.client,
+                                   self.shareclass_isin,
+                                   source_dir)
+
         self.shareclass_infos = None
         self.shareclass_nav = None
         self.subfund_infos = None
@@ -28,6 +37,10 @@ class Data_Bucket():
         self.instruments = None
         self.instruments_infos = None
         self.distribution_matrix = None
+        self.scr = None
+
+        self.processor = Data_Processor(self)
+        self.scr_module = SCR_Module(self)
     
     def fetch(self):
         """
@@ -52,10 +65,12 @@ class Data_Bucket():
         """
 
         if isin is None and self.shareclass_infos is None:
-            self.shareclass_infos = self.fetcher.fetch_shareclass_infos()
+            self.shareclass_infos = self.fetcher.fetch_shareclass_infos(self.shareclass_isin)
 
         if isin is None and info is None:
             return self.shareclass_infos
+        elif isin is None:
+            return self.shareclass_infos[info].iloc[0]
         elif info is None:
             return self.fetcher.fetch_shareclass_infos(isin=isin)
         else:
@@ -75,7 +90,8 @@ class Data_Bucket():
         if isin is None and self.shareclass_nav is None:
             self.shareclass_nav = self.fetcher.fetch_shareclass_nav(sc_id,
                                                                     sc_curr,
-                                                                    sf_curr)
+                                                                    sf_curr,
+                                                                    self.date)
         
         #print("isin: ", isin)
         #print("info: ", info)
@@ -85,11 +101,13 @@ class Data_Bucket():
         elif info is None:
             return self.fetcher.fetch_shareclass_nav(sc_id,
                                                      sc_curr,
-                                                     sf_curr)
+                                                     sf_curr,
+                                                     self.date)
         else:
             return self.fetcher.fetch_shareclass_nav(sc_id,
                                                      sc_curr,
-                                                     sf_curr)[info].iloc[0]
+                                                     sf_curr,
+                                                     self.date)[info].iloc[0]
 
     def get_subfund_infos(self, info=None):
         if self.subfund_infos is None:
@@ -116,27 +134,50 @@ class Data_Bucket():
             return self.fund_infos[info].iloc[0]
 
     def get_instruments(self, info=None, indicator=None):
+        """
+        Returns all required info of all instruments associated to the required
+        shareclass or group.
+
+        Args:
+            info (str or [str]): required infos.
+            indicator (["all", str, [str]]): shareclass grouping indicator.
+
+        Returns:
+            pandas.DataFrame: selected infos (if None: all) of the instruments
+            associated to the selected grouping indicators (if None: instruments
+            associated to the current shareclass).
+        """
         # get all instruments associated to the subfund
         id_subfund = self.get_shareclass_infos("id_subfund")
         if self.instruments is None:
-            self.instruments = self.fetcher.fetch_instruments(id_subfund)
+            self.instruments = self.fetcher.fetch_instruments(id_subfund,
+                                                              self.date,
+                                                              self.client)
 
+        # fill missing value (for BIL)
+        # TODO: remove when bdd has been updated
         self.instruments["hedge_indicator"].fillna(
             self.get_subfund_infos("subfund_indicator"), inplace=True)
 
-        # return all required info of all instruments associated
-        # to the required shareclass or group
+        # if indicator is "all" return the required infos for all instruments
+        # of the subfund.
         if indicator == "all":
             if info is None:
                 return self.instruments
             else:
                 return self.instruments[info]
+
+        # if indicator is None, return the instruments associated to the current
+        # shareclass (i.e: self.shareclass_isin)
+        # the corresponding instruments are those associated to the shareclass 
+        # itself, to any group the shareclass belongs to and to the whole subfund.
         elif indicator is None:
             indicators = self.get_shareclass_infos(["shareclass",
                                                     "shareclass_id"]).tolist()
             indicators.append(self.get_subfund_infos("subfund_indicator"))
             indicator = indicators
-        
+
+        # return selected infos
         if info is None:
             return self.instruments.loc[
                 self.instruments["hedge_indicator"].isin(indicator)]
@@ -145,9 +186,17 @@ class Data_Bucket():
                 self.instruments["hedge_indicator"].isin(indicator),
                 info]
 
-    def get_instruments_infos(self, info=None):
+    def get_instruments_infos(self, info=None, instruments=None):
+        """
+        Feed instruments infos, both data and processed.
+
+        Args:
+            info ([str, [str], None]): required infos.
+            instruments (["all", str, [str], None]): required instruments index
+        """
+
         if self.instruments_infos is None:
-            instrument_id_list = self.get_instruments().index
+            instrument_id_list = self.get_instruments(indicator="all").index
             db_instruments_infos = \
                 self.fetcher.fetch_db_instruments_infos(instrument_id_list)
 
@@ -155,9 +204,34 @@ class Data_Bucket():
 
             self.instruments_infos = sp_instruments_infos.append(db_instruments_infos)
             self.processor.clean_instruments_infos()
+            # process data if needed
+            self.processor.process_instruments()
 
-        return self.instruments_infos.loc[self.get_instruments().index]
-    
+        if instruments is None and info is None:
+            return self.instruments_infos.loc[self.get_instruments().index]
+        elif instruments is None:
+            return self.instruments_infos.loc[self.get_instruments().index,
+                                              info]
+        elif instruments=="all":
+            if info is None:
+                return self.instruments_infos.loc[self.get_instruments(indicator="all").index]
+            else:
+                return self.instruments_infos.loc[self.get_instruments(indicator="all").index,
+                                                  info]
+        elif isinstance(instruments, list):
+            if info is None:
+                return self.instruments_infos.loc[instruments]
+            else:
+                return self.instruments_infos.loc[instruments,
+                                                  info]
+        else:
+            if info is None:
+                return self.instruments_infos.loc[instruments]
+            else:
+                return self.instruments_infos.loc[instruments,
+                                                  info].iloc[0]
+
+                                                
     def get_isins_in_group(self, indicator):
         id_subfund = self.get_subfund_infos("id")
 
@@ -173,20 +247,36 @@ class Data_Bucket():
         
         return isins
 
-    def get_distribution_vector(self, isin):
+    def get_distribution_vector(self):
         if self.distribution_matrix is None:
             self.distribution_matrix = self.processor.compute_distribution_matrix()
 
-        return self.distribution_matrix[isin]
+        return self.distribution_matrix[self.shareclass_isin]
     
-    def get_valuation_weight_vector(self, isin):
+    def get_valuation_weight_vector(self):
         if self.distribution_matrix is None:
             self.distribution_matrix = self.processor.compute_distribution_matrix()
 
-        return self.distribution_matrix[isin] / self.get_shareclass_nav("shareclass_total_net_asset_sf_curr")
+        return self.distribution_matrix[self.shareclass_isin] \
+               / self.get_shareclass_nav("shareclass_total_net_asset_sf_curr")
 
-    def get_distribution_weight(self, isin):
+    def get_distribution_weight(self):
         if self.distribution_matrix is None:
             self.distribution_matrix = self.processor.compute_distribution_matrix()
 
-        return self.distribution_matrix[isin] / self.get_instruments("market_and_accrued_fund")
+        return self.distribution_matrix[self.shareclass_isin] \
+               / self.get_instruments("market_and_accrued_fund")
+    
+    def get_SCR_results(self, submodule):
+        self.scr = pd.DataFrame(np.nan,
+                                index=self.get_instruments().index,
+                                columns=[FIELDS["97"],
+                                         FIELDS["98"],
+                                         FIELDS["99"],
+                                         FIELDS["100"],
+                                         FIELDS["102"],
+                                         FIELDS["105a"],
+                                         FIELDS["105b"]])    
+        self.scr_module.compute_SCR()
+
+        return self.scr[submodule]

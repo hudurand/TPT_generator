@@ -3,28 +3,29 @@ from pathlib import Path
 from timeit import default_timer as timer
 
 class Cash_Flow():
-    def __init__(self, date):
-        self.date = date
+    def __init__(self, data_bucket):
+        self.data_bucket = data_bucket
+        self.date = data_bucket.date
         self.actualized = False
         self.cash_flows_dict = {}
         self.load_rates()
 
-    def compute(self, report):
-        self.data = report.loc[:,["7_Reporting date",
-                                  "12_CIC code of the instrument",
-                                  "21_Quotation currency (A)",
-                                  "33_Coupon rate",
-                                  "38_Coupon payment frequency",
-                                  "39_Maturity date",
-                                  "43_Call / put date",
-                                  "45_Strike price for embedded (call/put) options",
-                                  "quantity_nominal"]]
+    def compute(self):
+        data = self.data_bucket.get_instruments_infos(
+                   info=["12_CIC code of the instrument",
+                         "21_Quotation currency (A)",
+                         "33_Coupon rate",
+                         "38_Coupon payment frequency",
+                         "39_Maturity date",
+                         "43_Call / put date",
+                         "45_Strike price for embedded (call/put) options"])
 
-        self.data["7_Reporting date"] = pd.to_datetime(self.data["7_Reporting date"])
-        self.data["43_Call / put date"] = pd.to_datetime(self.data["43_Call / put date"])
-        self.data["39_Maturity date"] = pd.to_datetime(self.data["39_Maturity date"], errors='coerce')
+        data["quantity_nominal"] = self.data_bucket.get_instruments("quantity_nominal")
+        data["7_Reporting date"] = pd.to_datetime(self.date)
+        data["43_Call / put date"] = pd.to_datetime(data["43_Call / put date"])
+        data["39_Maturity date"] = pd.to_datetime(data["39_Maturity date"], errors='coerce')
 
-        self.cash_flows_dict = {instrument[0] : self.compute_single(instrument[1]) for instrument in self.data.iterrows()}
+        self.cash_flows_dict = {instrument[0] : self.compute_single(instrument[1]) for instrument in data.iterrows()}
         self.actualized = True
 
     def compute_single(self, instrument):

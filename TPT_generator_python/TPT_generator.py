@@ -8,7 +8,6 @@ from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.styles import Alignment
 
 from .db_fetcher import TPT_Fetcher
-from .cash_flow import Cash_Flow
 from .scr_module import SCR_Module
 from .data_bucket import Data_Bucket
 from .processor import Data_Processor
@@ -20,12 +19,11 @@ class TPT_Generator():
     subfund at a given date.
 
     It proceed by shareclass, generating the report for the shareclass 
-    identified by the isin code held in ``self.shareclass_isin``.
+    identified by the isin code held in ````.
     
     It relies on the Data_Bucket object to feed it the data required to fill
     the report and perform minor operation on the data to fill the columns 
-    correctly. more complex computations are handled by the ``cash_flows``, 
-    ``scr_module`` and ``processor`` modules.
+    correctly.
 
     Args:
         date (pd.DateTime): reporting date
@@ -64,26 +62,19 @@ class TPT_Generator():
         """
         Initialise report-specific attributes helper objects.
         """
-        self.date = date
-        self.client = client
-        self.shareclass_isin = shareclass_isin
+
         self.source_dir = Path(source_dir)
         self.output_dir = Path(output_dir)
-
+        
         self.sym_adj = sym_adj
         self.fields = FIELDS
         self.IN18 = IN18
-        self.cash_flows = Cash_Flow(self.date.strftime('%Y%m%d'))
-        self.scr_module = SCR_Module()
 
-        self.fetcher = TPT_Fetcher(self.date,
-                                   self.client,
-                                   self.shareclass_isin,
-                                   self.source_dir)
-        self.data_bucket = Data_Bucket(self.client,
-                                       self.fetcher)
-        self.processor = Data_Processor(self.data_bucket,
-                                        self.fetcher)
+        self.data_bucket = Data_Bucket(date,
+                                       client,
+                                       shareclass_isin,
+                                       source_dir)
+
         self.currency_rate = self.data_bucket.get_shareclass_nav("shareclass_total_net_asset_sc_curr") \
                              / self.data_bucket.get_shareclass_nav("shareclass_total_net_asset_sf_curr")
         
@@ -109,8 +100,11 @@ class TPT_Generator():
         Saves the generated TPT report to an excel file using the AO template.
         """
         #root_path = Path('./data')
+        client = self.data_bucket.client
+        isin = self.data_bucket.shareclass_isin
+        date = self.data_bucket.date
         template_file_name = 'AO_TPT_V5.0_Template.xlsx'
-        output_file_name = f"AO_TPT_V5.0_{self.client}_{self.shareclass_isin}_{self.date}.xlsx"
+        output_file_name = f"AO_TPT_V5.0_{client}_{isin}_{date}.xlsx"
         template = openpyxl.load_workbook(self.source_dir / template_file_name)
         report = template.get_sheet_by_name('Report')
         rows = dataframe_to_rows(self.TPT_report, index=False)
@@ -154,14 +148,23 @@ class TPT_Generator():
         """
         self.check_required(["14"])
 
-        column = self.data_bucket.get_instruments_infos(info)
         self.TPT_report.set_index([self.fields["14"]], inplace=True)
-        self.TPT_report[info].update(
-            column[info])
+        self.TPT_report[info].update(self.data_bucket.get_instruments_infos(info=info))
+        self.TPT_report.reset_index(inplace=True)
+    
+    
+    def fill_SCR(self, submodule):
+        """
+        Abstracting class to fill fixed SCR computed values.
+        """
+        self.check_required(["14"])
+
+        self.TPT_report.set_index([self.fields["14"]], inplace=True)
+        self.TPT_report[submodule].update(self.data_bucket.get_SCR_results(submodule))
         self.TPT_report.reset_index(inplace=True)
 
     def fill_column_1(self):
-        self.TPT_report.loc[:,self.fields["1"]] = self.fetcher.shareclass_isin
+        self.TPT_report.loc[:,self.fields["1"]] = self.data_bucket.shareclass_isin
     
     def fill_column_2(self):
         self.TPT_report.loc[:,self.fields["2"]] = \
@@ -185,7 +188,7 @@ class TPT_Generator():
 
     def fill_column_7(self):
         self.TPT_report.loc[:,self.fields["7"]] = \
-            self.date.strftime('%Y-%m-%d')
+            self.data_bucket.date.strftime('%Y-%m-%d')
 
     def fill_column_8(self):
         self.TPT_report.loc[:,self.fields["8"]] = \
@@ -226,7 +229,7 @@ class TPT_Generator():
         self.fill_instrument_info(self.fields["13"])
 
     def fill_column_14(self):
-        column_14 = self.data_bucket.get_instruments_infos().index
+        column_14 = self.data_bucket.get_instruments().index
         
         self.TPT_report[self.fields["14"]].update(column_14.to_numpy())
 
@@ -244,7 +247,6 @@ class TPT_Generator():
 
     def fill_column_18(self):
         self.check_required(["12", "14"])
-        self.processor.compute_QN()
         #assert not self.TPT_report[self.fields["12"]].str.match("..22").any(), "some CIC code ends with 22 and are not supported yet"
 
         self.TPT_report.set_index([self.fields["14"]], inplace=True)
@@ -252,7 +254,7 @@ class TPT_Generator():
 
         column_18 = pd.Series(index=self.TPT_report.index)
         column_18 = self.data_bucket.get_instruments("quantity_nominal") \
-                    * self.data_bucket.get_distribution_weight(self.shareclass_isin)
+                    * self.data_bucket.get_distribution_weight()
 
         pattern = '|'.join([f"..{code}" for code in self.IN18])
 
@@ -269,14 +271,13 @@ class TPT_Generator():
 
     def fill_column_19(self):
         self.check_required(["12", "14"])
-        self.processor.compute_QN()
 
         #assert not self.TPT_report[self.fields["12"]].str.match("..22").any(), "some CIC code ends with 22 and are not supported yet"
 
         self.TPT_report.set_index([self.fields["14"]], inplace=True)
 
         column_19 = self.data_bucket.get_instruments("quantity_nominal") \
-                      * self.data_bucket.get_distribution_weight(self.shareclass_isin)
+                      * self.data_bucket.get_distribution_weight()
         
         pattern = '|'.join([f"..{code}" for code in self.IN18])
 
@@ -303,7 +304,7 @@ class TPT_Generator():
         self.TPT_report.set_index([self.fields["14"]], inplace=True)
 
         column_22 = self.data_bucket.get_instruments("market_and_accrued_asset") \
-                    * self.data_bucket.get_distribution_weight(self.shareclass_isin)
+                    * self.data_bucket.get_distribution_weight()
 
         self.TPT_report[self.fields["22"]].update(column_22)
         self.TPT_report.reset_index(inplace=True)
@@ -314,7 +315,7 @@ class TPT_Generator():
         self.TPT_report.set_index([self.fields["14"]], inplace=True)
 
         column_23 = self.data_bucket.get_instruments("market_asset") \
-                    * self.data_bucket.get_distribution_weight(self.shareclass_isin)
+                    * self.data_bucket.get_distribution_weight()
 
         self.TPT_report[self.fields["23"]].update(column_23)
         self.TPT_report.reset_index(inplace=True)
@@ -322,7 +323,7 @@ class TPT_Generator():
     def fill_column_24(self):
         self.check_required(["14"])
 
-        column_24 = self.data_bucket.get_valuation_weight_vector(self.shareclass_isin) \
+        column_24 = self.data_bucket.get_valuation_weight_vector() \
                     * self.data_bucket.get_shareclass_nav("shareclass_total_net_asset_sc_curr")
 
         self.TPT_report.set_index([self.fields["14"]], inplace=True)
@@ -335,7 +336,7 @@ class TPT_Generator():
         self.TPT_report.set_index([self.fields["14"]], inplace=True)
         
         column_25 = self.data_bucket.get_instruments("market_fund") \
-                    * self.data_bucket.get_distribution_weight(self.shareclass_isin) \
+                    * self.data_bucket.get_distribution_weight() \
                     * self.currency_rate
 
         self.TPT_report[self.fields["25"]].update(column_25.fillna(0))
@@ -344,7 +345,7 @@ class TPT_Generator():
     def fill_column_26(self):
         self.check_required(["14"])
 
-        column_26 = self.data_bucket.get_valuation_weight_vector(self.shareclass_isin)
+        column_26 = self.data_bucket.get_valuation_weight_vector()
 
         self.TPT_report.set_index([self.fields["14"]], inplace=True)
         self.TPT_report[self.fields["26"]].update(column_26)
@@ -365,20 +366,15 @@ class TPT_Generator():
         self.TPT_report.reset_index(inplace=True)
 
     def fill_column_28(self):
-        self.check_required(["12", "18", "19", "20", "21", "23", "25", "61", "62", "71", "72"])
+        self.check_required(["14"])
 
         self.TPT_report.set_index([self.fields["14"]], inplace=True)
 
-        pattern = "..22|..A2|..B4"
-
-        AI = self.data_bucket.get_instruments("market_and_accrued_asset").where(
-             ~self.TPT_report[self.fields["12"]].str.match(pattern),
-             self.data_bucket.get_instruments().apply(lambda x: self.compute_exception_AI(x), axis=1))
-
-        column_28 = AI * self.data_bucket.get_distribution_weight(self.shareclass_isin) \
-                       * self.data_bucket.get_instruments("market_fund") \
-                       / self.data_bucket.get_instruments("market_asset") \
-                       * self.currency_rate
+        column_28 = self.data_bucket.get_instruments_infos(info="ME") \
+                    * self.data_bucket.get_distribution_weight() \
+                    * self.data_bucket.get_instruments("market_fund") \
+                    / self.data_bucket.get_instruments("market_asset") \
+                    * self.currency_rate
 
         self.TPT_report[self.fields["28"]].update(column_28)
         self.TPT_report.reset_index(inplace=True)
@@ -615,160 +611,22 @@ class TPT_Generator():
         pass
     
     def fill_column_97(self):
-        def compute_97(row):
-            if self.TPT_report.loc[row.name, self.fields["12"]][2] in ["1", "2", "5"]:
-                if self.cash_flows[row.name]["rfr"].sum() == 0:
-                    return 0
-                else:
-                    return (1 - self.cash_flows[row.name]["up"].sum() \
-                               / self.cash_flows[row.name]["rfr"].sum()) \
-                               * self.TPT_report.loc[row.name, self.fields["26"]]
-            return 0
-
-        self.check_required(["7", "12", "14", "21", "26", "33", "38", "39", "43", "45"])
-
-        self.TPT_report.set_index([self.fields["14"]], inplace=True)
-
-        if not self.cash_flows.actualized:
-            self.cash_flows.compute(self.TPT_report.join(self.data_bucket.get_instruments("quantity_nominal")))
-        
-        column_97 = pd.DataFrame(index=self.TPT_report.index, columns=["col"])
-        
-        column_97 = column_97.apply(lambda row: compute_97(row), axis=1)
-                                    
-        self.TPT_report[self.fields["97"]].update(column_97)
-
-        self.TPT_report.reset_index(inplace=True)
+        self.fill_SCR(self.fields["97"])
 
     def fill_column_98(self):
-        def compute_98(row):
-            if self.TPT_report.loc[row.name, self.fields["12"]][2] in ["1", "2", "5"]:
-                if self.cash_flows[row.name]["rfr"].sum() == 0:
-                    return 0
-                else:
-                    return (1 - self.cash_flows[row.name]["down"].sum() \
-                               / self.cash_flows[row.name]["rfr"].sum()) \
-                               * self.TPT_report.loc[row.name, self.fields["26"]]
-            return 0
-
-        self.check_required(["7", "12", "14", "21", "26", "33", "38", "39", "43", "45"])
-
-        self.TPT_report.set_index([self.fields["14"]], inplace=True)
-        
-        if not self.cash_flows.actualized:
-            self.cash_flows.compute(self.TPT_report.join(self.data_bucket.get_instruments("quantity_nominal")))
-        
-        column_98 = pd.DataFrame(index=self.TPT_report.index, columns=["col"])
-
-        column_98 = column_98.apply(lambda row: compute_98(row), axis=1)
-        
-        self.TPT_report[self.fields["98"]].update(column_98)
-
-        self.TPT_report.reset_index(inplace=True)
+        self.fill_SCR(self.fields["98"])
 
     def fill_column_99(self):
-        def shock_down_type1(row):
-            if self.TPT_report.loc[row.name, self.fields["131"]] == "3L":
-                return self.TPT_report.loc[row.name, self.fields["26"]] * (0.39 + self.sym_adj/100)
+        self.fill_SCR(self.fields["99"])
 
-            elif self.TPT_report.loc[row.name, self.fields["12"]][2:] == "22":
-                if not pd.isnull(self.TPT_report.loc[row.name, [self.fields["71"]]].iloc[0]):
-                    main_ccy = self.TPT_report.loc[row.name, [self.fields["21"]]].iloc[0]
-                    underlying_ccy = self.TPT_report.loc[row.name, [self.fields["71"]]].iloc[0]
-            
-                    if main_ccy != underlying_ccy:
-                        EX = self.fetcher.ccy[main_ccy + underlying_ccy]
-                    else: 
-                        EX = 1
-
-                else: 
-                    EX = 1
-                
-                E = self.TPT_report.loc[row.name, self.fields["5"]]
-                T = self.TPT_report.loc[row.name, self.fields["18"]]
-                U = self.TPT_report.loc[row.name, self.fields["19"]]
-                AA = self.TPT_report.loc[row.name, self.fields["23"]]
-                AE = self.TPT_report.loc[row.name, self.fields["25"]]
-                BS = self.TPT_report.loc[row.name, self.fields["61"]]
-                CC = self.TPT_report.loc[row.name, self.fields["72"]]
-                CX = self.TPT_report.loc[row.name, self.fields["93"]]
-
-                return ((T + U) / BS * CC * EX * (CX / E) * (AE / AA)) * (0.39 + self.sym_adj/100)
-
-            else:
-                return 0
-
-        self.check_required(["5", "12", "18", "19", "23", "25", "26", "61", "72", "93", "131"])
-        self.TPT_report.set_index([self.fields["14"]], inplace=True)
-
-        column_99 = pd.DataFrame(index=self.TPT_report.index, columns=["col"])
-        column_99 = column_99.apply(lambda row: shock_down_type1(row), axis=1)
-
-        self.TPT_report[self.fields["99"]].update(column_99)
-
-        self.TPT_report.reset_index(inplace=True)
-    
     def fill_column_100(self):
-        def shock_down_type2(row):
-            if self.TPT_report.loc[row.name, self.fields["131"]] in ["4", "3X"] or\
-               self.TPT_report.loc[row.name, self.fields["12"]][2:] in ["B1", "B4"]:
-                return self.TPT_report.loc[row.name, self.fields["30"]] * (0.49 + self.sym_adj/100)
-            else:
-                return 0
-
-        self.check_required(["12", "30", "131"])
-        self.TPT_report.set_index([self.fields["14"]], inplace=True)
-
-        column_100 = pd.DataFrame(index=self.TPT_report.index, columns=["col"])
-        column_100 = column_100.apply(lambda row: shock_down_type2(row), axis=1)
-
-        self.TPT_report[self.fields["100"]].update(column_100)
-
-        self.TPT_report.reset_index(inplace=True)
+        self.fill_SCR(self.fields["100"])
     
     def fill_column_101(self):
         pass
 
     def fill_column_102(self):
-        def shock_down_spread(row):
-            #print("\n", row.name)
-            if self.TPT_report.loc[row.name, self.fields["131"]] in ["B", "E"]\
-                or self.TPT_report.loc[row.name, self.fields["39"]] == "nan":
-                return 0
-
-            # Government bonds
-            elif self.TPT_report.loc[row.name, self.fields["131"]] == "1":
-                if self.TPT_report.loc[row.name, self.fields["53"]] == "1":
-                    return 0
-                else:
-                    duration = self.TPT_report.loc[row.name, self.fields["90"]]
-                    CQS = self.TPT_report.loc[row.name, self.fields["59"]]
-                    shock = self.scr_module.spread_risk_parameter(3, duration, CQS)
-            # Covered bonds
-            elif self.TPT_report.loc[row.name, self.fields["55"]] == "C"\
-                and self.TPT_report.loc[row.name, self.fields["59"]] < 2:
-                duration = self.TPT_report.loc[row.name, self.fields["90"]]
-                CQS = self.TPT_report.loc[row.name, self.fields["59"]]
-                shock = self.scr_module.spread_risk_parameter(2, duration, CQS)
-            # General bonds and loans
-            elif self.TPT_report.loc[row.name, self.fields["12"]][2] in ["2", "8"]:
-                duration = self.TPT_report.loc[row.name, self.fields["90"]]
-                CQS = self.TPT_report.loc[row.name, self.fields["59"]]
-                shock = self.scr_module.spread_risk_parameter(1, duration, CQS)
-            else:
-                return 0 
-
-            return self.TPT_report.loc[row.name, self.fields["26"]] * shock
-            
-        self.check_required(["12", "14", "26", "53", "59", "90", "131"])
-        self.TPT_report.set_index([self.fields["14"]], inplace=True)
-
-        column_102 = pd.DataFrame(index=self.TPT_report.index, columns=["col"])
-        column_102 = column_102.apply(lambda row: shock_down_spread(row), axis=1)
-
-        self.TPT_report[self.fields["102"]].update(column_102)
-
-        self.TPT_report.reset_index(inplace=True)
+        self.fill_SCR(self.fields["102"])
     
     def fill_column_103(self):
         pass
@@ -780,43 +638,10 @@ class TPT_Generator():
         pass
 
     def fill_column_105a(self):
-        def shock_down_currency(row):
-            fund_curr = self.TPT_report.loc[row.name, self.fields["4"]]
-            quot_curr = self.TPT_report.loc[row.name, self.fields["21"]] 
-            if quot_curr != fund_curr :
-                return - self.TPT_report.loc[row.name, self.fields["30"]] * self.scr_module.currency_risk_parameter(fund_curr, quot_curr)
-            else:
-                return 0
-
-        self.check_required(["4", "21", "30"])
-        self.TPT_report.set_index([self.fields["14"]], inplace=True)
-
-        column_105a = pd.DataFrame(index=self.TPT_report.index, columns=["col"])
-        column_105a = column_105a.apply(lambda row: shock_down_currency(row), axis=1)
-
-        self.TPT_report[self.fields["105a"]].update(column_105a)
-
-        self.TPT_report.reset_index(inplace=True)
+        self.fill_SCR(self.fields["105a"])
 
     def fill_column_105b(self):
-        def shock_up_currency(row):
-            fund_curr = self.TPT_report.loc[row.name, self.fields["4"]]
-            quot_curr = self.TPT_report.loc[row.name, self.fields["21"]] 
-            if quot_curr != fund_curr :
-                return self.TPT_report.loc[row.name, self.fields["30"]] * self.scr_module.currency_risk_parameter(fund_curr, quot_curr)
-            else:
-                return 0
-
-        self.check_required(["4", "21", "30"])
-        self.TPT_report.set_index([self.fields["14"]], inplace=True)
-
-        column_105b = pd.DataFrame(index=self.TPT_report.index, columns=["col"])
-        column_105b = column_105b.apply(lambda row: shock_up_currency(row), axis=1)
-
-        self.TPT_report[self.fields["105b"]].update(column_105b)
-
-        self.TPT_report.reset_index(inplace=True)
-
+        self.fill_SCR(self.fields["105b"])
 
     def fill_column_106(self):
         pass
@@ -939,24 +764,7 @@ class TPT_Generator():
         pass
 
     def fill_column_131(self):
-        def select_value(row):
-            if row[self.fields["12"]][2] == "3":
-                if row[self.fields["12"]][:2] == "XL":
-                    return "3X"
-                else:
-                    return "3L"
-            if row[self.fields["12"]][2] in ["7", "8", "0"] and\
-               row[self.fields["24"]] < 0:
-                return "L"
-            
-            return row[self.fields["12"]][2]
-
-        self.check_required(["12", "14", "24"])
-
-        self.TPT_report.set_index([self.fields["14"]], inplace=True)
-
-        self.TPT_report[self.fields["131"]] = self.TPT_report.apply(lambda row: select_value(row), axis=1)
-        self.TPT_report.reset_index(inplace=True)
+        self.fill_instrument_info(self.fields["131"])
 
     def fill_column_132(self):
         pass
@@ -975,94 +783,7 @@ class TPT_Generator():
         pass
 
     def fill_column_137(self):
-        def select_value(row):
-            if row[self.fields["15"]] == 1:
-                return np.nan
-            if row[self.fields["12"]][2] == "1":
-                return 10
-            if row[self.fields["12"]][2] == "6":
-                return 6
-            if row[self.fields["12"]][2] == "7":
-                if row[self.fields["54"]][0] == "K" or\
-                   row[self.fields["54"]][0] == "O":
-                    return 12
-                else:
-                    return 13
-            if row[self.fields["54"]] == "K6411":
-                return 1
-            if row[self.fields["54"]] == "K6419":
-                return 2
-            if row[self.fields["54"]] == "K6630":
-                if row[self.fields["12"]][2:] == "43":
-                    return 3
-                else:
-                    return 4
-            if row[self.fields["54"]] == "K6619" or\
-               row[self.fields["54"]][:3] == "K649":
-                return 5
-            if row[self.fields["54"]][:3] == "K651" or\
-               row[self.fields["54"]][:3] == "K652":
-                return 7
-            if row[self.fields["54"]][:3] == "K653":
-                return 8
-            if row[self.fields["54"]][0] == "T":
-                return 
-            if row[self.fields["54"]][0] not in ["K","T"]:
-                return 9
-
-        self.check_required(["12", "14", "15", "54"])
-
-        self.TPT_report.set_index([self.fields["14"]], inplace=True)
-
-        self.TPT_report[self.fields["137"]] = self.TPT_report.apply(lambda row: select_value(row), axis=1)
-        
-        self.TPT_report.reset_index(inplace=True)
+        self.fill_instrument_info(self.fields["137"])
 
     def fill_column_1000(self):
         self.TPT_report[self.fields["1000"]] = "V5.0"
-    
-    def compute_exception_AI(self, row):
-        CIC = self.TPT_report.loc[row.name, [self.fields["12"]]].iloc[0]
-
-        V = (self.data_bucket.get_instruments("quantity_nominal") \
-            * self.data_bucket.get_distribution_weight(self.shareclass_isin)).loc[row.name]
-
-        CC = self.TPT_report.loc[row.name, [self.fields["72"]]].iloc[0] if \
-            not pd.isnull(self.TPT_report.loc[row.name, [self.fields["72"]]]).iloc[0] else 1
-        
-        W = self.TPT_report.loc[row.name, [self.fields["20"]]].iloc[0]
-        BS = self.TPT_report.loc[row.name, [self.fields["61"]]].iloc[0]
-
-        if not pd.isnull(self.TPT_report.loc[row.name, [self.fields["71"]]].iloc[0]):
-            main_ccy = self.TPT_report.loc[row.name, [self.fields["21"]]].iloc[0]
-            underlying_ccy = self.TPT_report.loc[row.name, [self.fields["71"]]].iloc[0]
-        
-            if main_ccy != underlying_ccy:
-                EX = self.fetcher.ccy[main_ccy + underlying_ccy]
-            else: 
-                EX = 1
-        
-        else: 
-            EX = 1
-    
-        if CIC[2:] == "22":
-            CX = self.TPT_report.loc[row.name, [self.fields["73"]]].iloc[0] \
-                if not pd.isnull(self.TPT_report.loc[row.name, [self.fields["73"]]].iloc[0]) else 1
-
-            AI = max(V / BS * CC * EX * CX, 
-                     row["market_and_accrued_asset"])
-        
-        elif CIC[2:] == "A2":
-            AI = min(V * W/100 * CC * EX, 
-                     row["market_and_accrued_asset"])
-            
-        elif CIC[2:] == "B4":
-            BT = self.TPT_report.loc[row.name, [self.fields["62"]]].iloc[0]\
-                 if not pd.isnull(self.TPT_report.loc[row.name, [self.fields["62"]]].iloc[0]) else 1
-            AI = max(V * BT * (CC-BS) * EX,
-                     row["market_and_accrued_asset"])
-
-        else:
-            AI = row["market_and_accrued_asset"]
-
-        return AI
