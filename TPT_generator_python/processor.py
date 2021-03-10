@@ -20,6 +20,9 @@ class Data_Processor():
         if FIELDS["131"] not in self.data_bucket.instruments_infos.columns:
             self.compute_131()
 
+        if self.data_bucket.instruments_infos[FIELDS["59"]].isnull().values.all():
+            self.compute_59()
+
     def compute_market_exposure(self):
         pattern = "..22|..A2|..B4"
 
@@ -123,7 +126,6 @@ class Data_Processor():
         return D
 
     def set_sp_instrument_infos(self):
-        
         columns = DB_INSTRUMENTS_INFOS_MAP.values()
         instruments = self.data_bucket.get_instruments(indicator="all")
         cash_index, fet_index, other_index = self.loc_sp_instruments()
@@ -160,7 +162,7 @@ class Data_Processor():
         sp_instruments_infos.loc[:, "50_Identification of the group"] = self.data_bucket.get_fund_infos("depositary_group_lei")
         #sp_instruments_infos.loc[:, "51_Type of identification code for issuer group"] = self.data_bucket.get_fund_infos("")
         sp_instruments_infos.loc[:, "52_Issuer country"] = self.data_bucket.get_fund_infos("depositary_country")
-        #sp_instruments_infos.loc[:, "53_Issuer economic area"] = self.data_bucket.get_fund_infos("")
+        sp_instruments_infos.loc[:, "53_Issuer economic area"] = self.data_bucket.get_fund_infos("issuer_economic_area")
         sp_instruments_infos.loc[:, "54_Economic sector"] = self.data_bucket.get_fund_infos("depositary_nace")
         
         return sp_instruments_infos
@@ -254,13 +256,18 @@ class Data_Processor():
 
     def compute_59(self):
         def select_value(row):
-            #TODO: this is very wrong
             # use field 54 -> code NACE
             # based in EU
+            # required only for some CIC code
+            # provided by the client: fetch from db
+            # default rating based on NACE
+            # if required and no infos 9
             if row[FIELDS["12"]][2] in ["1", "2", "5", "6", "8", "C", "D", "E", "F"] or \
                 row[FIELDS["12"]][2:] in ["73", "74", "75"]:
-                    # TODO: this should be in the client table
-                    return 3
+                    if row[FIELDS["54"]] == "K6419":
+                        return 3
+                    else:
+                        return 9
             else:
                 return np.nan
         
@@ -329,7 +336,7 @@ class Data_Processor():
             * self.data_bucket.get_distribution_weight().loc[row.name]
 
         CC = row[FIELDS["72"]] if \
-            not pd.isnull(row[FIELDS["72"]]) else 1
+             not pd.isnull(row[FIELDS["72"]]) else 1
         
         W = row[FIELDS["20"]]
         BS = row[FIELDS["61"]]
@@ -347,22 +354,21 @@ class Data_Processor():
             EX = 1
     
         if CIC[2:] == "22":
-            CX = row[FIELDS["73"]] \
-                if not pd.isnull(row[FIELDS["73"]]) else 1
-
-            AI = max(V / BS * CC * EX * CX, 
+            CX = row[FIELDS["93"]] \
+                if not pd.isnull(row[FIELDS["93"]]) else 1
+            ME = max(V / BS * CC * EX * CX, 
                      self.data_bucket.get_instruments("market_and_accrued_asset").loc[row.name])
         
         elif CIC[2:] == "A2":
-            AI = min(V * W/100 * CC * EX, 
+            ME = min(V * W/100 * CC * EX, 
                      self.data_bucket.get_instruments("market_and_accrued_asset").loc[row.name])
             
         elif CIC[2:] == "B4":
-            BT = row[FIELDS["62"]]\
-                 if not pd.isnull(row[FIELDS["62"]]) else 1
-            AI = max(V * BT * (CC-BS) * EX,
+            BT = row[FIELDS["62"]] \
+                if not pd.isnull(row[FIELDS["62"]]) else 1
+            ME = max(V * BT * (CC-BS) * EX,
                      self.data_bucket.get_instruments("market_and_accrued_asset").loc[row.name])
 
         else:
-            AI = self.data_bucket.get_instruments("market_and_accrued_asset").loc[row.name]
-        return AI
+            ME = self.data_bucket.get_instruments("market_and_accrued_asset").loc[row.name]
+        return ME

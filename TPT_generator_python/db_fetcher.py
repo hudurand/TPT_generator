@@ -81,7 +81,6 @@ class TPT_Fetcher():
         #'fund_issuer_country, '
         #'fund_custodian_country, '
         #'custodian_name '
-        
         fund_infos = pd.read_sql_query('SELECT '
                                        'fund_name, '
                                        'fund_issuer_group_code, '
@@ -98,7 +97,11 @@ class TPT_Fetcher():
                                        f"WHERE f.id='{fund_id}'", 
                                        self.connector)
         fund_infos.rename(columns={"depositary_lei":"fund_issuer_code"}, inplace=True)
-        
+        fund_infos["issuer_economic_area"] = pd.read_sql_query('SELECT '
+                                                               'geographic '
+                                                               'FROM intranet.dbo.iso_code '
+                                                               f"WHERE iso_code_2='{fund_infos['fund_country'].iloc[0]}'",
+                                                               self.connector)
         return fund_infos
 
     def fetch_shareclass_nav(self,

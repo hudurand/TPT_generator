@@ -125,7 +125,7 @@ def reference_TPT_report(params_fixt):
     report["117_Fund Issuer Name"].replace({"BIL Invest Equities Emerging Markets" : "BIL Invest Equities Emerging Market"},
                                            inplace=True)
     report["49_Name of the group of the issuer"] = report["49_Name of the group of the issuer"].str.strip()
-    
+    report["46_Issuer name"].replace({"RBC Luxembourg":"RBC Investor Services Bank S.A."}, regex=True, inplace=True)
     return report
 
 #@pytest.fixture(scope="module")
@@ -574,8 +574,8 @@ def test_fill_column_26(generator, reference_TPT_report):
     prod = generator.TPT_report.set_index("14_Identification code of the financial instrument").sort_index()
     ref = reference_TPT_report.set_index("14_Identification code of the financial instrument").sort_index()
     
-    column = pd.to_numeric(prod["26_Valuation weight"]).round(3)
-    ref_col = pd.to_numeric(ref["26_Valuation weight"]).round(3)
+    column = pd.to_numeric(prod["26_Valuation weight"]).round(5)
+    ref_col = pd.to_numeric(ref["26_Valuation weight"]).round(5)
 
     diff1 = column.loc[column != ref_col]
     print(diff1)
@@ -584,7 +584,7 @@ def test_fill_column_26(generator, reference_TPT_report):
 
     assert_series_equal(column, ref_col, 
                         check_dtype=False,
-                        check_less_precise=3)
+                        check_less_precise=5)
 
 def test_fill_column_27(generator, reference_TPT_report):
 
@@ -969,7 +969,6 @@ def test_fill_column_58b(generator, reference_TPT_report):
     assert_series_equal(column, ref["58b_Nature of the TRANCHE"], check_dtype=False)
 
 def test_fill_column_59(generator, reference_TPT_report):
-    #TODO: this is very wrong
     generator.fill_column_59()
     
     prod = generator.TPT_report.set_index("14_Identification code of the financial instrument").sort_index()
