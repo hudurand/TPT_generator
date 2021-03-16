@@ -5,7 +5,7 @@ This documentation details the implementation and methodology adopted to generat
 
 ## Commands
 
-* `python ./generate_TPT_report.py generate from config <config-file>` - generate one or multiple TPT report from a config file.
+* `python ./generate_TPT_report.py generate_from_config <config-file>` - generate one or multiple TPT report from a config file.
 
 ## Project layout
 
@@ -30,11 +30,6 @@ This documentation details the implementation and methodology adopted to generat
 ## TODOs
 
 - CQS mapping
-- Move processing methods that remains in TPT_generator to processor
-    - AI 
-    - Cash flows
-    - SCR
 - Complete SCR module (filling SCR sheet)
 - Compute actualisation rates
-- Refactor processing module
 - Implement quality check 

@@ -29,7 +29,8 @@ class TPT_Fetcher():
         self.ccy = None
 
     def fetch_shareclass_infos(self, isin):
-
+        if isinstance(isin, list):
+            isin = "', '".join(isin)
         query = ('SELECT '
                  'id, '
                  'code_isin, '
@@ -40,19 +41,20 @@ class TPT_Fetcher():
                  'id_subfund, '
                  'type_tpt '
                  'FROM intranet.dbo.shareclass '
-                 f"WHERE code_isin='{isin}'")
+                 f"WHERE code_isin in('{isin}')")
 
         return pd.read_sql_query(query, self.connector)
 
-    def fetch_isins_in_group(self, indicator, id_subfund):
-        isins = pd.read_sql_query('SELECT '
-                                 'code_isin '
-                                 'FROM intranet.dbo.shareclass '
-                                 f"WHERE id_subfund='{id_subfund}'"
-                                 f"AND (shareclass_id='{indicator}' "
-                                 f"OR shareclass='{indicator}') "
-                                 "AND supprime=0",
-                                 self.connector)
+    def fetch_isins_in_group(self, id_subfund, indicator):
+        query = ('SELECT '
+                 'code_isin '
+                 'FROM intranet.dbo.shareclass '
+                 f"WHERE id_subfund='{id_subfund}' "
+                 f"AND (shareclass_id='{indicator}' "
+                 f"OR shareclass='{indicator}') "
+                 "AND supprime=0")
+        isins = pd.read_sql_query(query,
+                                  self.connector)
 
         return isins["code_isin"].tolist()
                                  
@@ -145,7 +147,10 @@ class TPT_Fetcher():
 
         return isins["code_isin"].tolist()
 
-    def fetch_instruments(self, subfund_id, date, client):
+    def fetch_instruments(self, subfund_id, date):
+        # "rating_moodys",
+        # "rating_sp",
+        # "rating_fitch"
         infos = ', '.join(["asset_id_string",
                            "hedge_indicator",
                            "asset_name",
@@ -171,43 +176,43 @@ class TPT_Fetcher():
         instruments = pd.read_sql_query(query,
                                         self.connector)
 
-        instruments.rename(columns={"asset_id_string":"14_Identification code of the financial instrument"}, inplace=True)
-        instruments.set_index("14_Identification code of the financial instrument", inplace=True)
-
-        if instruments.index.duplicated().any():
-            fused = pd.DataFrame(columns=["quantity_nominal"
-                                          "market_and_accrued_fund",
-                                          "market_fund",
-                                          "accrued_fund",
-                                          "market_and_accrued_asset",
-                                          "market_asset",
-                                          "accrued_asset"])
-            fused["quantity_nominal"] = instruments.groupby("14_Identification code of the financial instrument")["quantity_nominal"].sum()
-            fused["market_and_accrued_fund"] = instruments.groupby("14_Identification code of the financial instrument")["market_and_accrued_fund"].sum()
-            fused["market_fund"] = instruments.groupby("14_Identification code of the financial instrument")["market_fund"].sum()
-            fused["accrued_fund"] = instruments.groupby("14_Identification code of the financial instrument")["accrued_fund"].sum()
-            fused["market_and_accrued_asset"] = instruments.groupby("14_Identification code of the financial instrument")["market_and_accrued_asset"].sum()
-            fused["market_asset"] = instruments.groupby("14_Identification code of the financial instrument")["market_asset"].sum()
-            fused["accrued_asset"] = instruments.groupby("14_Identification code of the financial instrument")["accrued_asset"].sum()
-
-            instruments = instruments[~instruments.index.duplicated()]
-            instruments["quantity_nominal"].update(fused["quantity_nominal"])
-            instruments["market_and_accrued_fund"].update(fused["market_and_accrued_fund"])
-            instruments["market_fund"].update(fused["market_fund"])
-            instruments["accrued_fund"].update(fused["accrued_fund"])
-            instruments["market_and_accrued_asset"].update(fused["market_and_accrued_asset"])
-            instruments["market_asset"].update(fused["market_asset"])
-            instruments["accrued_asset"].update(fused["accrued_asset"])
-
-        instruments["accrued_fund"].fillna(0, inplace=True)
-        instruments["accrued_asset"].fillna(0, inplace=True)
-        
-        if client == "BIL":
-            instruments["market_fund"] = instruments["market_and_accrued_fund"] - instruments["accrued_fund"]
-            instruments["market_asset"] = instruments["market_and_accrued_asset"] - instruments["accrued_asset"]
-        elif client == "Dynasty":
-            instruments["market_and_accrued_asset"] = instruments["market_asset"] + instruments["accrued_asset"]
-        
+#        instruments.rename(columns={"asset_id_string":"14_Identification code of the financial instrument"}, inplace=True)
+#        instruments.set_index("14_Identification code of the financial instrument", inplace=True)
+#
+#        if instruments.index.duplicated().any():
+#            fused = pd.DataFrame(columns=["quantity_nominal"
+#                                          "market_and_accrued_fund",
+#                                          "market_fund",
+#                                          "accrued_fund",
+#                                          "market_and_accrued_asset",
+#                                          "market_asset",
+#                                          "accrued_asset"])
+#            fused["quantity_nominal"] = instruments.groupby("14_Identification code of the financial instrument")["quantity_nominal"].sum()
+#            fused["market_and_accrued_fund"] = instruments.groupby("14_Identification code of the financial instrument")["market_and_accrued_fund"].sum()
+#            fused["market_fund"] = instruments.groupby("14_Identification code of the financial instrument")["market_fund"].sum()
+#            fused["accrued_fund"] = instruments.groupby("14_Identification code of the financial instrument")["accrued_fund"].sum()
+#            fused["market_and_accrued_asset"] = instruments.groupby("14_Identification code of the financial instrument")["market_and_accrued_asset"].sum()
+#            fused["market_asset"] = instruments.groupby("14_Identification code of the financial instrument")["market_asset"].sum()
+#            fused["accrued_asset"] = instruments.groupby("14_Identification code of the financial instrument")["accrued_asset"].sum()
+#
+#            instruments = instruments[~instruments.index.duplicated()]
+#            instruments["quantity_nominal"].update(fused["quantity_nominal"])
+#            instruments["market_and_accrued_fund"].update(fused["market_and_accrued_fund"])
+#            instruments["market_fund"].update(fused["market_fund"])
+#            instruments["accrued_fund"].update(fused["accrued_fund"])
+#            instruments["market_and_accrued_asset"].update(fused["market_and_accrued_asset"])
+#            instruments["market_asset"].update(fused["market_asset"])
+#            instruments["accrued_asset"].update(fused["accrued_asset"])
+#
+#        instruments["accrued_fund"].fillna(0, inplace=True)
+#        instruments["accrued_asset"].fillna(0, inplace=True)
+#        
+#        if client == "BIL":
+#            instruments["market_fund"] = instruments["market_and_accrued_fund"] - instruments["accrued_fund"]
+#            instruments["market_asset"] = instruments["market_and_accrued_asset"] - instruments["accrued_asset"]
+#        elif client == "Dynasty":
+#            instruments["market_and_accrued_asset"] = instruments["market_asset"] + instruments["accrued_asset"]
+#        
         return instruments
 
     def fetch_db_instruments_infos(self, id_list):
@@ -262,7 +267,7 @@ class TPT_Fetcher():
             ccy_save = self.ccy.reset_index()
             ccy_save.to_feather(self.source_dir / "currency.feather")
         else:
-            self.ccy = pd.read_feather(self.source_dir / "currency.feather").set_index("pair", inplace=True)
+            self.ccy = pd.read_feather(self.source_dir / "currency.feather").set_index("pair")
 
         self.bloomberg_infos = BBG.loc[BBG["ISIN"].isin(id_list),
                                        ["ISIN",

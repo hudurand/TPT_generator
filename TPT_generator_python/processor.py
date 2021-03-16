@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 from .constants import DB_INSTRUMENTS_INFOS_MAP, FIELDS
+from pandas.testing import assert_index_equal
+
 
 class Data_Processor():
 
@@ -9,35 +11,43 @@ class Data_Processor():
         self.fetcher = data_bucket.fetcher
 
     def process_instruments(self):
-        if "QN" not in self.data_bucket.instruments_infos.columns:
-            self.data_bucket.instruments_infos["QN"] = np.nan
-            self.compute_QN()
+        self.data_bucket.instruments.rename(columns={"asset_id_string":"instrument"}, inplace=True)
+        self.data_bucket.instruments.set_index("instrument", inplace=True)
+
+        if self.data_bucket.instruments.index.duplicated().any():
+            fused = pd.DataFrame(columns=["quantity_nominal"
+                                          "market_and_accrued_fund",
+                                          "market_fund",
+                                          "accrued_fund",
+                                          "market_and_accrued_asset",
+                                          "market_asset",
+                                          "accrued_asset"])
+            fused["quantity_nominal"] = self.data_bucket.instruments.groupby("instrument")["quantity_nominal"].sum()
+            fused["market_and_accrued_fund"] = self.data_bucket.instruments.groupby("instrument")["market_and_accrued_fund"].sum()
+            fused["market_fund"] = self.data_bucket.instruments.groupby("instrument")["market_fund"].sum()
+            fused["accrued_fund"] = self.data_bucket.instruments.groupby("instrument")["accrued_fund"].sum()
+            fused["market_and_accrued_asset"] = self.data_bucket.instruments.groupby("instrument")["market_and_accrued_asset"].sum()
+            fused["market_asset"] = self.data_bucket.instruments.groupby("instrument")["market_asset"].sum()
+            fused["accrued_asset"] = self.data_bucket.instruments.groupby("instrument")["accrued_asset"].sum()
+
+            self.data_bucket.instruments = self.data_bucket.instruments[~self.data_bucket.instruments.index.duplicated()]
+            self.data_bucket.instruments["quantity_nominal"].update(fused["quantity_nominal"])
+            self.data_bucket.instruments["market_and_accrued_fund"].update(fused["market_and_accrued_fund"])
+            self.data_bucket.instruments["market_fund"].update(fused["market_fund"])
+            self.data_bucket.instruments["accrued_fund"].update(fused["accrued_fund"])
+            self.data_bucket.instruments["market_and_accrued_asset"].update(fused["market_and_accrued_asset"])
+            self.data_bucket.instruments["market_asset"].update(fused["market_asset"])
+            self.data_bucket.instruments["accrued_asset"].update(fused["accrued_asset"])
+
+        self.data_bucket.instruments["accrued_fund"].fillna(0, inplace=True)
+        self.data_bucket.instruments["accrued_asset"].fillna(0, inplace=True)
         
-        if "ME" not in self.data_bucket.instruments_infos.columns:
-            self.data_bucket.instruments_infos["ME"] = np.nan
-            self.compute_market_exposure()
-
-        if FIELDS["131"] not in self.data_bucket.instruments_infos.columns:
-            self.compute_131()
-
-        if self.data_bucket.instruments_infos[FIELDS["59"]].isnull().values.all():
-            self.compute_59()
-
-    def compute_market_exposure(self):
-        pattern = "..22|..A2|..B4"
-
-        self.data_bucket.instruments_infos["ME"] = \
-            self.data_bucket.get_instruments("market_and_accrued_asset").where(
-                ~self.data_bucket.get_instruments_infos(info=FIELDS["12"]).str.match(pattern),
-                self.data_bucket.get_instruments_infos().apply(
-                    lambda x: self.compute_ME_exception(x), axis=1))
+        if self.data_bucket.client == "BIL":
+            self.data_bucket.instruments["market_fund"] = self.data_bucket.instruments["market_and_accrued_fund"] - self.data_bucket.instruments["accrued_fund"]
+            self.data_bucket.instruments["market_asset"] = self.data_bucket.instruments["market_and_accrued_asset"] - self.data_bucket.instruments["accrued_asset"]
+        elif self.data_bucket.client == "Dynasty":
+            self.data_bucket.instruments["market_and_accrued_asset"] = self.data_bucket.instruments["market_asset"] + self.data_bucket.instruments["accrued_asset"]
         
-    def compute_QN(self):
-        price = self.data_bucket.get_instruments(info="price_market", indicator="all")
-        amount = self.data_bucket.get_instruments(info="quantity_nominal", indicator="all")
-        value = self.data_bucket.get_instruments(info="market_asset", indicator="all")
-
-        self.data_bucket.instruments["QN"] = price * amount / value 
 
     def clean_instruments_infos(self):
         self.data_bucket.instruments_infos.loc[:,
@@ -50,13 +60,6 @@ class Data_Processor():
             "39_Maturity date"
             ] = self.data_bucket.get_instruments("maturity_date").astype('str')
 
-        #self.data_bucket.instruments_infos["59_Credit quality step"] = \
-        #    self.data_bucket.instruments_infos["12_CIC code of the instrument"].apply(
-        #        lambda x: self.map_CQS(x))
-        self.data_bucket.instruments_infos["61_Strike price"].where(~self.data_bucket.get_instruments("contract_number").notnull(),
-                                                        self.data_bucket.get_instruments("contract_number").apply(lambda x: self.compute_strike_price(x)),
-                                                        inplace=True)
-
         self.data_bucket.instruments_infos["17_Instrument name"].replace({"Subscription tax IEH": "Subscription tax"}, regex=True, inplace=True)
         self.data_bucket.instruments_infos["17_Instrument name"].replace({"Subscription tax I": "Subscription tax"}, regex=True, inplace=True)
         self.data_bucket.instruments_infos["21_Quotation currency (A)"].replace({"GBp":"GBP"}, inplace=True)        
@@ -68,10 +71,28 @@ class Data_Processor():
         self.data_bucket.instruments_infos["93_Sensitivity to underlying asset price (delta)"].replace("-", np.nan, inplace=True)
         self.data_bucket.instruments_infos["94_Convexity / gamma for derivatives"].replace("-", np.nan, inplace=True)
         self.data_bucket.instruments_infos["94b_Vega"].replace("-", np.nan, inplace=True)
-        
+
+    def process_instruments_infos(self):
+        if self.data_bucket.instruments_infos[FIELDS["59"]].isnull().values.all():
+            self.compute_59()
+        if FIELDS["137"] not in self.data_bucket.instruments_infos.columns:
+            self.compute_137()
+        self.compute_SP()
+
+    def compute_processing_data(self):
+        if self.data_bucket.processing_data is None:
+            self.data_bucket.init_processing_data()
+
+        self.compute_distribution_matrix()
+        self.compute_QN()
+        self.compute_131()
+        self.compute_market_exposure()
+        #self.compute_market_exposure_weight()
+
     def compute_distribution_matrix(self):
-        instruments = self.data_bucket.get_instruments(indicator="all", info=["hedge_indicator",
-                                                                              "market_and_accrued_fund"])
+        instruments = self.data_bucket.get_instruments(indicator="all", 
+                                                       info=["hedge_indicator",
+                                                             "market_and_accrued_fund"])
         shareclasses = self.data_bucket.get_subfund_shareclasses()
         NAVs = pd.DataFrame(index=shareclasses, 
                     columns=["shareclass_total_net_asset_sf_curr",
@@ -123,7 +144,34 @@ class Data_Processor():
                 / (SK.loc[BETAS["fund"]==1].sum(axis=1) \
                    - instruments.loc[BETAS["fund"]==0, "market_and_accrued_fund"].sum())
 
-        return D
+        All = slice(None)
+        D.index.names = ["instrument"]
+        for isin in shareclasses:
+            index0 = self.data_bucket.processing_data.loc[(All, isin), All].index.get_level_values(0)
+            assert_index_equal(index0, D[isin].index)
+            self.data_bucket.processing_data.loc[(All, isin), "distribution"] = D[isin].values
+            self.data_bucket.processing_data.loc[(All, isin), "valuation weight"] = \
+                D[isin].values / self.data_bucket.get_shareclass_nav(info="shareclass_total_net_asset_sf_curr")
+            self.data_bucket.processing_data.loc[(All, isin), "distribution weight"] = \
+                self.data_bucket.processing_data.loc[(All, isin), "distribution"] \
+                / self.data_bucket.processing_data.loc[(All, isin), "market_and_accrued_fund"]
+            
+            # take the opportunity to compute total cash value
+            self.data_bucket.shareclass_infos.loc[isin, "cash"] = \
+                self.data_bucket.processing_data.xs(isin, level="shareclass").loc[
+                    self.data_bucket.processing_data.xs(isin, level="shareclass")[FIELDS["12"]] == "XT72"]["distribution"].sum() \
+                * self.data_bucket.get_shareclass_nav(info="shareclass_total_net_asset_sc_curr") \
+                / self.data_bucket.get_shareclass_nav(info="shareclass_total_net_asset_sf_curr")
+
+    def compute_QN(self):
+        
+        price = self.data_bucket.get_instruments(info="price_market", indicator="all")
+        amount = self.data_bucket.get_instruments(info="quantity_nominal", indicator="all")
+        value = self.data_bucket.get_instruments(info="market_asset", indicator="all")
+
+        self.data_bucket.instruments["QN"] = price * amount / value
+
+        self.data_bucket.processing_data = self.data_bucket.processing_data.join(self.data_bucket.instruments["QN"])
 
     def set_sp_instrument_infos(self):
         columns = DB_INSTRUMENTS_INFOS_MAP.values()
@@ -221,9 +269,15 @@ class Data_Processor():
 
         return CASH, FET, OTHER
   
-    def compute_strike_price(self, contract_number):
-        instruments = self.data_bucket.get_instruments()
+    def compute_SP(self):
+        forward_strike_price = self.data_bucket.get_instruments(info="contract_number",
+                                                                indicator="all").apply(lambda x: self.compute_strike_price(x))
+        self.data_bucket.instruments_infos["61_Strike price"].where(forward_strike_price.isnull(),
+                                                                    forward_strike_price,
+                                                                    inplace=True) 
 
+    def compute_strike_price(self, contract_number):
+        instruments = self.data_bucket.get_instruments(indicator="all")
         if contract_number is None:
             return None
         else:
@@ -260,14 +314,18 @@ class Data_Processor():
             # based in EU
             # required only for some CIC code
             # provided by the client: fetch from db
+            #     get one before lowest rating and map to CQS
             # default rating based on NACE
             # if required and no infos 9
-            if row[FIELDS["12"]][2] in ["1", "2", "5", "6", "8", "C", "D", "E", "F"] or \
-                row[FIELDS["12"]][2:] in ["73", "74", "75"]:
+            if (row[FIELDS["12"]][2] in ["1", "2", "5", "6", "8", "C", "D", "E", "F"]
+                or row[FIELDS["12"]][2:] in ["73", "74", "75"]):
+                    #if (row[FIELDS["54"]] == "K6419"
+                    #    or row[FIELDS["54"]][0] in ["D", "O"]):
                     if row[FIELDS["54"]] == "K6419":
                         return 3
                     else:
                         return 9
+                #return 9
             else:
                 return np.nan
         
@@ -282,13 +340,14 @@ class Data_Processor():
                 else:
                     return "3L"
             if row[FIELDS["12"]][2] in ["7", "8", "0"] and\
-               self.data_bucket.get_valuation_weight_vector().loc[row.name] < 0:
+               row["distribution"] < 0:
                 return "L"
             
             return row[FIELDS["12"]][2]
 
-        self.data_bucket.instruments_infos[FIELDS["131"]] = \
-            self.data_bucket.instruments_infos.apply(lambda row: select_value(row), axis=1)
+        self.data_bucket.processing_data[FIELDS["131"]] = \
+            self.data_bucket.processing_data.apply(
+                lambda row: select_value(row), axis=1)
     
     def compute_137(self):
         def select_value(row):
@@ -329,17 +388,32 @@ class Data_Processor():
         self.data_bucket.instruments_infos[FIELDS["137"]] = \
             self.data_bucket.instruments_infos.apply(lambda row: select_value(row), axis=1)
     
+    def compute_market_exposure(self):
+        pattern = "..22|..A2|..B4"
+        #All = slice(None)
+        #self.data_bucket.processing_data.join(
+        self.data_bucket.processing_data["ME"] = \
+            self.data_bucket.processing_data["distribution"].where(
+                ~self.data_bucket.processing_data[FIELDS["12"]].str.match(pattern),
+                self.data_bucket.processing_data.apply(
+                    lambda x: self.compute_ME_exception(x), axis=1))
+        #self.data_bucket.instruments_infos["ME"] = \
+        #    self.data_bucket.get_instruments("market_and_accrued_asset").where(
+        #        ~self.data_bucket.get_instruments_infos(info=FIELDS["12"]).str.match(pattern),
+        #        self.data_bucket.get_instruments_infos().apply(
+        #            lambda x: self.compute_ME_exception(x), axis=1))
+    
     def compute_ME_exception(self, row):
-        CIC = row[FIELDS["12"]]
 
-        V = self.data_bucket.get_instruments("quantity_nominal").loc[row.name] \
-            * self.data_bucket.get_distribution_weight().loc[row.name]
+        CIC = row[FIELDS["12"]]
+        V = row["distribution"]
 
         CC = row[FIELDS["72"]] if \
              not pd.isnull(row[FIELDS["72"]]) else 1
         
         W = row[FIELDS["20"]]
-        BS = row[FIELDS["61"]]
+        BS = row["61_Strike price"] if \
+             not pd.isnull(row["61_Strike price"]) else 1
 
         if not pd.isnull(row[FIELDS["71"]]):
             main_ccy = row[FIELDS["21"]]
@@ -357,18 +431,18 @@ class Data_Processor():
             CX = row[FIELDS["93"]] \
                 if not pd.isnull(row[FIELDS["93"]]) else 1
             ME = max(V / BS * CC * EX * CX, 
-                     self.data_bucket.get_instruments("market_and_accrued_asset").loc[row.name])
+                     row["distribution"])
         
         elif CIC[2:] == "A2":
             ME = min(V * W/100 * CC * EX, 
-                     self.data_bucket.get_instruments("market_and_accrued_asset").loc[row.name])
+                     row["distribution"])
             
         elif CIC[2:] == "B4":
             BT = row[FIELDS["62"]] \
                 if not pd.isnull(row[FIELDS["62"]]) else 1
             ME = max(V * BT * (CC-BS) * EX,
-                     self.data_bucket.get_instruments("market_and_accrued_asset").loc[row.name])
+                     row["distribution"])
 
         else:
-            ME = self.data_bucket.get_instruments("market_and_accrued_asset").loc[row.name]
+            ME = row["distribution"]
         return ME

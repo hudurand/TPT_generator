@@ -1,8 +1,8 @@
 site_name: TPT generator doc
 nav:
     - Overview: index.md
-    - Design: design.md
     - Methodology: methodology.md
+    - Developer guide: developer.md
     - Reference: reference.md
 theme:
     name: "material"

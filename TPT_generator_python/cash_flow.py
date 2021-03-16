@@ -8,7 +8,7 @@ class Cash_Flow():
         self.date = data_bucket.date
         self.actualized = False
         self.cash_flows_dict = {}
-        self.load_rates()
+        self.load_rates(data_bucket.source_dir)
 
     def compute(self):
         data = self.data_bucket.get_instruments_infos(
@@ -122,8 +122,7 @@ class Cash_Flow():
         
         return CF
 
-    def load_rates(self):       
-        root_path = Path('./data')
+    def load_rates(self, root_path):
         CF_file_name = f"Template Cash flows TPT_{self.date}.xlsm"
         RFR_feather = f"RFR_{self.date}.feather"
         UP_feather = f"UP_{self.date}.feather"

@@ -49,9 +49,9 @@ class SCR_Module():
         self.compute_98()
         self.compute_99()
         self.compute_100()
-    #    self.compute_102()
-    #    self.compute_105a()
-    #    self.compute_105b()
+        self.compute_102()
+        self.compute_105a()
+        self.compute_105b()
 
     def spread_risk_parameter(self, bond_type, duration, CQS):
         duration_group = min(duration // 5, 4)
@@ -81,7 +81,8 @@ class SCR_Module():
             self.cash_flows.compute()
         
         self.data_bucket.scr[FIELDS["97"]] = \
-            self.data_bucket.get_instruments_infos().apply(
+            self.data_bucket.get_processing_data([FIELDS["12"],
+                                                 "valuation weight"]).apply(
                 lambda row: self.compute_97_single(row), axis=1)
 
     def compute_97_single(self, row):
@@ -91,7 +92,7 @@ class SCR_Module():
             else:
                 return (1 - self.cash_flows[row.name]["up"].sum() \
                             / self.cash_flows[row.name]["rfr"].sum()) \
-                            * self.data_bucket.get_valuation_weight_vector().loc[row.name]
+                            * row["valuation weight"]
         return 0
     
     def compute_98(self):
@@ -99,8 +100,10 @@ class SCR_Module():
             self.cash_flows.compute()
 
         self.data_bucket.scr[FIELDS["98"]] = \
-            self.data_bucket.get_instruments_infos().apply(
+            self.data_bucket.get_processing_data([FIELDS["12"],
+                                                 "valuation weight"]).apply(
                 lambda row: self.compute_98_single(row), axis=1)
+
     
     def compute_98_single(self, row):
         if row[FIELDS["12"]][2] in ["1", "2", "5"]:
@@ -109,17 +112,22 @@ class SCR_Module():
             else:
                 return (1 - self.cash_flows[row.name]["down"].sum() \
                             / self.cash_flows[row.name]["rfr"].sum()) \
-                            * self.data_bucket.get_valuation_weight_vector().loc[row.name]
+                            * row["valuation weight"]
         return 0
 
     def compute_99(self):
         self.data_bucket.scr[FIELDS["99"]] = \
-            self.data_bucket.get_instruments_infos().apply(
+            self.data_bucket.get_processing_data([FIELDS["12"],
+                                                  FIELDS["131"],
+                                                 "valuation weight"]).apply(
                 lambda row: self.shock_down_type1(row), axis=1)
+#        self.data_bucket.scr[FIELDS["99"]] = \
+#            self.data_bucket.get_instruments_infos().apply(
+#                lambda row: self.shock_down_type1(row), axis=1)
 
     def shock_down_type1(self, row):
         if row[FIELDS["131"]] == "3L":
-            return self.data_bucket.get_valuation_weight_vector().loc[row.name] * (0.39 + self.sym_adj/100)
+            return row["valuation weight"] * (0.39 + self.sym_adj/100)
 
         elif row[FIELDS["12"]][2:] == "22":
             if not pd.isnull(row[FIELDS["71"]]):
@@ -150,22 +158,30 @@ class SCR_Module():
 
     def compute_100(self):
         self.data_bucket.scr[FIELDS["100"]] = \
-            self.data_bucket.get_instruments_infos().apply(
-                lambda row: self.shock_down_type1(row), axis=1)
-
+            self.data_bucket.get_processing_data([FIELDS["12"],
+                                                  FIELDS["131"],
+                                                  "ME"]).apply(
+                lambda row: self.shock_down_type2(row), axis=1)
 
     def shock_down_type2(self, row):
         if row[FIELDS["131"]] in ["4", "3X"] or\
             row[FIELDS["12"]][2:] in ["B1", "B4"]:
-            return row[FIELDS["30"]] * (0.49 + self.sym_adj/100)
+            return row["ME"] * (0.49 + self.sym_adj/100)
         else:
             return 0
 
     def compute_102(self):
         self.data_bucket.scr[FIELDS["102"]] = \
-            self.data_bucket.get_instruments_infos().apply(
+            self.data_bucket.get_processing_data("valuation weight") \
+            * self.data_bucket.get_processing_data([FIELDS["12"],
+                                                    FIELDS["39"],
+                                                    FIELDS["55"],
+                                                    FIELDS["53"],
+                                                    FIELDS["59"],
+                                                    FIELDS["90"],
+                                                    FIELDS["131"],
+                                                    "valuation weight"]).apply(
                 lambda row: self.shock_down_spread(row), axis=1)
-
 
     def shock_down_spread(self, row):
         #print("\n", row.name)
@@ -173,7 +189,7 @@ class SCR_Module():
             or row[FIELDS["39"]] == "nan":
             return 0
 
-            # Government bonds
+        # Government bonds
         elif row[FIELDS["131"]] == "1":
             if row[FIELDS["53"]] == "1":
                 return 0
@@ -181,12 +197,14 @@ class SCR_Module():
                 duration = row[FIELDS["90"]]
                 CQS = row[FIELDS["59"]]
                 shock = self.spread_risk_parameter(3, duration, CQS)
+
         # Covered bonds
         elif row[FIELDS["55"]] == "C"\
             and row[FIELDS["59"]] < 2:
             duration = row[FIELDS["90"]]
             CQS = row[FIELDS["59"]]
             shock = self.spread_risk_parameter(2, duration, CQS)
+
         # General bonds and loans
         elif row[FIELDS["12"]][2] in ["2", "8"]:
             duration = row[FIELDS["90"]]
@@ -195,29 +213,38 @@ class SCR_Module():
         else:
             return 0 
 
-        return self.data_bucket.get_valuation_weight_vector * shock
+        return shock
 
     def compute_105a(self):
-        self.data_bucket.scr[FIELDS["102"]] = \
-            self.data_bucket.get_instruments_infos().apply(
+        self.data_bucket.scr[FIELDS["105a"]] = \
+            self.data_bucket.get_processing_data([FIELDS["21"],
+                                                  "ME",
+                                                  "valuation weight"]).apply(
+                lambda row: self.shock_up_currency(row), axis=1)
+
+    def shock_up_currency(self, row):
+        fund_curr = self.data_bucket.get_shareclass_infos("shareclass_currency")
+        quot_curr = row[FIELDS["21"]] 
+        if quot_curr != fund_curr :
+            return row["ME"] * self.currency_risk_parameter(fund_curr, quot_curr)
+        else:
+            return 0
+
+    def compute_105b(self):
+        self.data_bucket.scr[FIELDS["105b"]] = \
+            self.data_bucket.get_processing_data([FIELDS["21"],
+                                                  "ME",
+                                                  "valuation weight"]).apply(
                 lambda row: self.shock_down_currency(row), axis=1)
 
     def shock_down_currency(self, row):
-        fund_curr = row[FIELDS["4"]]
+        fund_curr = self.data_bucket.get_shareclass_infos("shareclass_currency")
         quot_curr = row[FIELDS["21"]] 
         if quot_curr != fund_curr :
-            return - row[FIELDS["30"]] * self.currency_risk_parameter(fund_curr, quot_curr)
+            return - row["ME"] * self.currency_risk_parameter(fund_curr, quot_curr)
         else:
             return 0
-
-    def shock_up_currency(self, row):
-        fund_curr = row[FIELDS["4"]]
-        quot_curr = row[FIELDS["21"]] 
-        if quot_curr != fund_curr :
-            return row[FIELDS["30"]] * self.currency_risk_parameter(fund_curr, quot_curr)
-        else:
-            return 0
-
+    
     def define_parameters(self):
         self.general_bonds_param = {
             0 : {
@@ -284,7 +311,8 @@ class SCR_Module():
                 3 : (0.0, 1.4),
                 4 : (0.0, 2.5),
                 5 : (0.0, 4.5),
-                6 : (0.0, 4.5)},
+                6 : (0.0, 4.5),
+                9 : (0.0, 3.0)},
             1 : {
                 0 : (0.0, 0.0),
                 1 : (0.0, 0.0),
@@ -292,7 +320,8 @@ class SCR_Module():
                 3 : (7.0, 0.7),
                 4 : (12.5, 1.5),
                 5 : (22.5, 2.5),
-                6 : (22.5, 2.5)},
+                6 : (22.5, 2.5),
+                9 : (15.0, 1.7)},
             2 : {
                 0 : (0.0, 0.0),
                 1 : (0.0, 0.0),
@@ -300,7 +329,8 @@ class SCR_Module():
                 3 : (10.5, 0.5),
                 4 : (20.0, 1.0),
                 5 : (35.0, 1.8),
-                6 : (35.0, 1.8)},
+                6 : (35.0, 1.8),
+                9 : (23.5, 1.2)},
             3 : {
                 0 : (0.0, 0.0),
                 1 : (0.0, 0.0),
@@ -308,7 +338,8 @@ class SCR_Module():
                 3 : (13.0, 0.5),
                 4 : (25.0, 1.0),
                 5 : (44.0, 0.5),
-                6 : (44.0, 0.5)},
+                6 : (44.0, 0.5),
+                9 : (23.5, 1.2)},
             4 : {
                 0 : (0.0, 0.0),
                 1 : (0.0, 0.0),
@@ -316,7 +347,12 @@ class SCR_Module():
                 3 : (15.5, 0.5),
                 4 : (30.0, 0.5),
                 5 : (46.5, 0.5),
-                6 : (46.5, 0.5)}
+                6 : (46.5, 0.5),
+                9 : (35.5, 0.5)}
+        }
+
+        self.unrated = {
+            0 : (0 , 3)
         }
         
         self.curr_param = np.array([[0.00, 0.39, 1.81, 2.18, 1.96, 2.00],
