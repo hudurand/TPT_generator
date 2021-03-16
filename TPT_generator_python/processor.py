@@ -1,10 +1,10 @@
 import pandas as pd
 import numpy as np
-from .constants import DB_INSTRUMENTS_INFOS_MAP, FIELDS
+from .constants import DB_INSTRUMENTS_INFOS_MAP, FIELDS, ALL
 from pandas.testing import assert_index_equal
 
 
-class Data_Processor():
+class DataProcessor():
 
     def __init__(self, data_bucket):
         self.data_bucket = data_bucket
@@ -15,7 +15,7 @@ class Data_Processor():
         self.data_bucket.instruments.set_index("instrument", inplace=True)
 
         if self.data_bucket.instruments.index.duplicated().any():
-            fused = pd.DataFrame(columns=["quantity_nominal"
+            fused = pd.DataFrame(columns=["quantity_nominal",
                                           "market_and_accrued_fund",
                                           "market_fund",
                                           "accrued_fund",
@@ -77,84 +77,84 @@ class Data_Processor():
             self.compute_59()
         if FIELDS["137"] not in self.data_bucket.instruments_infos.columns:
             self.compute_137()
-        self.compute_SP()
+        self.compute_strike_prices()
 
     def compute_processing_data(self):
         if self.data_bucket.processing_data is None:
             self.data_bucket.init_processing_data()
 
         self.compute_distribution_matrix()
-        self.compute_QN()
+        self.compute_qn_det()
         self.compute_131()
         self.compute_market_exposure()
         #self.compute_market_exposure_weight()
 
     def compute_distribution_matrix(self):
-        instruments = self.data_bucket.get_instruments(indicator="all", 
-                                                       info=["hedge_indicator",
-                                                             "market_and_accrued_fund"])
+        instruments = self.data_bucket.get_instruments_by_index(
+            ALL, 
+            info=["hedge_indicator", "market_and_accrued_fund"])
+
         shareclasses = self.data_bucket.get_subfund_shareclasses()
-        NAVs = pd.DataFrame(index=shareclasses, 
+        navs = pd.DataFrame(index=shareclasses, 
                     columns=["shareclass_total_net_asset_sf_curr",
                              "subfund_total_net_asset",
                              "indicators"],
                     dtype=object)
 
-        NAVs["indicators"] = NAVs["indicators"].astype(object)
+        navs["indicators"] = navs["indicators"].astype(object)
         for isin in shareclasses:
-            NAVs.loc[isin, "shareclass_total_net_asset_sf_curr"] = \
+            navs.loc[isin, "shareclass_total_net_asset_sf_curr"] = \
                 self.data_bucket.get_shareclass_nav(isin=isin, info="shareclass_total_net_asset_sf_curr")
-            NAVs.loc[isin, "subfund_total_net_asset"] = \
+            navs.loc[isin, "subfund_total_net_asset"] = \
                 self.data_bucket.get_shareclass_nav(isin=isin, info="subfund_total_net_asset")
-            NAVs.at[isin, "indicators"] = \
+            navs.at[isin, "indicators"] = \
                 [self.data_bucket.get_subfund_infos("subfund_indicator"),
                  self.data_bucket.get_shareclass_infos(isin=isin, info="shareclass"),
                  self.data_bucket.get_shareclass_infos(isin=isin, info="shareclass_id")]
 
-        BETAS = pd.DataFrame(1, index=instruments.index, columns=NAVs.index)
+        betas = pd.DataFrame(1, index=instruments.index, columns=navs.index)
         for isin in shareclasses:
-            BETAS[isin].where(
-                instruments["hedge_indicator"].isin(NAVs.loc[isin, "indicators"]),
+            betas[isin].where(
+                instruments["hedge_indicator"].isin(navs.loc[isin, "indicators"]),
                 0,
                 inplace=True)
-        BETAS.sort_index(inplace=True)
-        BETAS["fund"] = 1
+        betas.sort_index(inplace=True)
+        betas["fund"] = 1
         for isin in shareclasses:
-            BETAS["fund"] = BETAS["fund"] * BETAS[isin]
+            betas["fund"] = betas["fund"] * betas[isin]
 
-        SK = pd.DataFrame(0, index=instruments.index, columns=NAVs.index)
+        shareclass_keys = pd.DataFrame(0, index=instruments.index, columns=navs.index)
         for isin in shareclasses:
-            SK[isin].where(
-                ~(instruments["hedge_indicator"].isin(NAVs.loc[isin, "indicators"])),
-                NAVs.loc[isin, "shareclass_total_net_asset_sf_curr"].astype('float64'),
+            shareclass_keys[isin].where(
+                ~(instruments["hedge_indicator"].isin(navs.loc[isin, "indicators"])),
+                navs.loc[isin, "shareclass_total_net_asset_sf_curr"].astype('float64'),
                 inplace=True)
-        SK.sort_index(inplace=True)
+        shareclass_keys.sort_index(inplace=True)
 
-        D = pd.DataFrame(0, index=instruments.index, columns=NAVs.index)
+        distributed = pd.DataFrame(0, index=instruments.index, columns=navs.index)
         for isin in shareclasses:
-            D.loc[BETAS["fund"]==0, isin] = \
-                instruments.loc[BETAS["fund"]==0, "market_and_accrued_fund"] \
-                * SK.loc[BETAS["fund"]==0, isin] / SK.loc[BETAS["fund"]==0].sum(axis=1)
+            distributed.loc[betas["fund"]==0, isin] = \
+                instruments.loc[betas["fund"]==0, "market_and_accrued_fund"] \
+                * shareclass_keys.loc[betas["fund"]==0, isin] / shareclass_keys.loc[betas["fund"]==0].sum(axis=1)
 
         for isin in shareclasses:
-            D.loc[BETAS["fund"]==1, isin] = \
-                instruments.loc[BETAS["fund"]==1, "market_and_accrued_fund"] \
-                * (SK.loc[BETAS["fund"]==1, isin] \
-                   - D.loc[((BETAS[isin]==1) & (BETAS["fund"]==0)), isin].sum()) \
-                / (SK.loc[BETAS["fund"]==1].sum(axis=1) \
-                   - instruments.loc[BETAS["fund"]==0, "market_and_accrued_fund"].sum())
+            distributed.loc[betas["fund"]==1, isin] = \
+                instruments.loc[betas["fund"]==1, "market_and_accrued_fund"] \
+                * (shareclass_keys.loc[betas["fund"]==1, isin] \
+                   - distributed.loc[((betas[isin]==1) & (betas["fund"]==0)), isin].sum()) \
+                / (shareclass_keys.loc[betas["fund"]==1].sum(axis=1) \
+                   - instruments.loc[betas["fund"]==0, "market_and_accrued_fund"].sum())
 
-        All = slice(None)
-        D.index.names = ["instrument"]
+        distributed.index.names = ["instrument"]
         for isin in shareclasses:
-            index0 = self.data_bucket.processing_data.loc[(All, isin), All].index.get_level_values(0)
-            assert_index_equal(index0, D[isin].index)
-            self.data_bucket.processing_data.loc[(All, isin), "distribution"] = D[isin].values
-            self.data_bucket.processing_data.loc[(All, isin), "valuation weight"] = \
-                D[isin].values / self.data_bucket.get_shareclass_nav(info="shareclass_total_net_asset_sf_curr")
-            self.data_bucket.processing_data.loc[(All, isin), "distribution weight"] = \
-                self.data_bucket.processing_data.loc[(All, isin), "distribution"] \
-                / self.data_bucket.processing_data.loc[(All, isin), "market_and_accrued_fund"]
+            index0 = self.data_bucket.processing_data.loc[(ALL, isin), ALL].index.get_level_values(0)
+            assert_index_equal(index0, distributed.index)
+            self.data_bucket.processing_data.loc[(ALL, isin), "distribution"] = distributed[isin].values
+            self.data_bucket.processing_data.loc[(ALL, isin), "valuation weight"] = \
+                distributed[isin].values / self.data_bucket.get_shareclass_nav(info="shareclass_total_net_asset_sf_curr")
+            self.data_bucket.processing_data.loc[(ALL, isin), "distribution weight"] = \
+                self.data_bucket.processing_data.loc[(ALL, isin), "distribution"] \
+                / self.data_bucket.processing_data.loc[(ALL, isin), "market_and_accrued_fund"]
             
             # take the opportunity to compute total cash value
             self.data_bucket.shareclass_infos.loc[isin, "cash"] = \
@@ -163,11 +163,11 @@ class Data_Processor():
                 * self.data_bucket.get_shareclass_nav(info="shareclass_total_net_asset_sc_curr") \
                 / self.data_bucket.get_shareclass_nav(info="shareclass_total_net_asset_sf_curr")
 
-    def compute_QN(self):
+    def compute_qn_det(self):
         
-        price = self.data_bucket.get_instruments(info="price_market", indicator="all")
-        amount = self.data_bucket.get_instruments(info="quantity_nominal", indicator="all")
-        value = self.data_bucket.get_instruments(info="market_asset", indicator="all")
+        price = self.data_bucket.get_instruments_by_index(ALL, info="price_market")
+        amount = self.data_bucket.get_instruments_by_index(ALL, info="quantity_nominal")
+        value = self.data_bucket.get_instruments_by_index(ALL, info="market_asset")
 
         self.data_bucket.instruments["QN"] = price * amount / value
 
@@ -175,7 +175,7 @@ class Data_Processor():
 
     def set_sp_instrument_infos(self):
         columns = DB_INSTRUMENTS_INFOS_MAP.values()
-        instruments = self.data_bucket.get_instruments(indicator="all")
+        instruments = self.data_bucket.get_instruments_by_index(ALL)
         cash_index, fet_index, other_index = self.loc_sp_instruments()
         sp_index = cash_index + fet_index + other_index
 
@@ -208,7 +208,6 @@ class Data_Processor():
         sp_instruments_infos.loc[:, "47_Issuer identification code"] = self.data_bucket.get_fund_infos("fund_issuer_code")
         sp_instruments_infos.loc[:, "49_Name of the group of the issuer"] = self.data_bucket.get_fund_infos("depositary_group_name")
         sp_instruments_infos.loc[:, "50_Identification of the group"] = self.data_bucket.get_fund_infos("depositary_group_lei")
-        #sp_instruments_infos.loc[:, "51_Type of identification code for issuer group"] = self.data_bucket.get_fund_infos("")
         sp_instruments_infos.loc[:, "52_Issuer country"] = self.data_bucket.get_fund_infos("depositary_country")
         sp_instruments_infos.loc[:, "53_Issuer economic area"] = self.data_bucket.get_fund_infos("issuer_economic_area")
         sp_instruments_infos.loc[:, "54_Economic sector"] = self.data_bucket.get_fund_infos("depositary_nace")
@@ -217,7 +216,7 @@ class Data_Processor():
 
     def loc_sp_instruments(self):
         client = self.data_bucket.client
-        instruments = self.data_bucket.get_instruments(indicator="all")
+        instruments = self.data_bucket.get_instruments_by_index(ALL)
 
         if client == "BIL":
             CASH = instruments.index[
@@ -269,15 +268,18 @@ class Data_Processor():
 
         return CASH, FET, OTHER
   
-    def compute_SP(self):
-        forward_strike_price = self.data_bucket.get_instruments(info="contract_number",
-                                                                indicator="all").apply(lambda x: self.compute_strike_price(x))
+    def compute_strike_prices(self):
+        forward_strike_price = self.data_bucket.get_instruments_by_index(
+            ALL,
+            info="contract_number"
+            ).apply(lambda x: self.compute_strike_price_single(x))
+
         self.data_bucket.instruments_infos["61_Strike price"].where(forward_strike_price.isnull(),
                                                                     forward_strike_price,
                                                                     inplace=True) 
 
-    def compute_strike_price(self, contract_number):
-        instruments = self.data_bucket.get_instruments(indicator="all")
+    def compute_strike_price_single(self, contract_number):
+        instruments = self.data_bucket.get_instruments_by_index(ALL)
         if contract_number is None:
             return None
         else:
@@ -390,20 +392,13 @@ class Data_Processor():
     
     def compute_market_exposure(self):
         pattern = "..22|..A2|..B4"
-        #All = slice(None)
-        #self.data_bucket.processing_data.join(
         self.data_bucket.processing_data["ME"] = \
             self.data_bucket.processing_data["distribution"].where(
                 ~self.data_bucket.processing_data[FIELDS["12"]].str.match(pattern),
                 self.data_bucket.processing_data.apply(
-                    lambda x: self.compute_ME_exception(x), axis=1))
-        #self.data_bucket.instruments_infos["ME"] = \
-        #    self.data_bucket.get_instruments("market_and_accrued_asset").where(
-        #        ~self.data_bucket.get_instruments_infos(info=FIELDS["12"]).str.match(pattern),
-        #        self.data_bucket.get_instruments_infos().apply(
-        #            lambda x: self.compute_ME_exception(x), axis=1))
+                    lambda x: self.compute_mrktexp_exception(x), axis=1))
     
-    def compute_ME_exception(self, row):
+    def compute_mrktexp_exception(self, row):
 
         CIC = row[FIELDS["12"]]
         V = row["distribution"]

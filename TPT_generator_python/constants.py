@@ -1,3 +1,5 @@
+ALL = slice(None)
+
 FIELDS = {
     "1" : r"1_Portfolio identifying data",
     "2" : r"2_Type of identification code for the fund share or portfolio",

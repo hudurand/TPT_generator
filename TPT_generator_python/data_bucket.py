@@ -1,11 +1,11 @@
 import pandas as pd
 import numpy as np
-from .db_fetcher import TPT_Fetcher
-from .processor import Data_Processor
-from .scr_module import SCR_Module
-from .constants import DB_INSTRUMENTS_INFOS_MAP, FIELDS
+from .db_fetcher import TPTFetcher
+from .processor import DataProcessor
+from .scr_module import SCRModule
+from .constants import DB_INSTRUMENTS_INFOS_MAP, FIELDS, ALL
 
-class Data_Bucket():
+class DataBucket():
     """
     Container class to hold the data coming from the database as well as
     resulting preprocessing in a semi-structured way and feed them to the 
@@ -29,7 +29,7 @@ class Data_Bucket():
         self.source_dir = source_dir
 
         # Initialise fetcher
-        self.fetcher = TPT_Fetcher(self.date,
+        self.fetcher = TPTFetcher(self.date,
                                    self.client,
                                    self.shareclass_isin,
                                    source_dir)
@@ -48,8 +48,8 @@ class Data_Bucket():
         self.scr = None
         
         # Data processing objects
-        self.processor = Data_Processor(self)
-        self.scr_module = SCR_Module(self)
+        self.processor = DataProcessor(self)
+        self.scr_module = SCRModule(self)
     
     def fetch(self):
         """
@@ -66,12 +66,13 @@ class Data_Bucket():
     def init_processing_data(self):
         
         isins = self.shareclass_infos.index
-        index = pd.MultiIndex.from_product([self.get_instruments(indicator="all").index,
+        index = pd.MultiIndex.from_product([self.get_instruments_by_index(idx=ALL).index,
                                             isins], names=["instrument", "shareclass"])
         self.processing_data = pd.DataFrame(index=index)
         self.processing_data = \
             self.processing_data.join(
-                self.get_instruments_infos(info=[FIELDS["12"],
+                self.get_instruments_infos(idx=ALL,
+                                           info=[FIELDS["12"],
                                                  FIELDS["20"],
                                                  FIELDS["21"],
                                                  FIELDS["39"],
@@ -83,12 +84,11 @@ class Data_Bucket():
                                                  FIELDS["71"],
                                                  FIELDS["72"],
                                                  FIELDS["90"],
-                                                 FIELDS["93"]],
-                                            instruments="all")) # whole subfund processing don't forget to specify `instruments="all"`
+                                                 FIELDS["93"]]))
         self.processing_data = \
             self.processing_data.join(
-                self.get_instruments(info="market_and_accrued_fund",
-                                     indicator="all")) # whole subfund processing don't forget to specify `indicator="all"`
+                self.get_instruments_by_index(idx=ALL,
+                                              info="market_and_accrued_fund"))
 
     def get_shareclass_infos(self, info=None, isin=None):
         """
@@ -109,13 +109,11 @@ class Data_Bucket():
                 self.fetcher.fetch_shareclass_infos(
                     other_isins).set_index("code_isin"))
 
-        if isin == "all":
-            isin = self.shareclass_infos.index.tolist()
         if isin is None and info is None:
             return self.shareclass_infos.loc[self.shareclass_isin]
         elif isin is None:
             return self.shareclass_infos.loc[self.shareclass_isin,
-                                            info]
+                                             info]
         elif info is None:
             return self.shareclass_infos.loc[isin]
         else:
@@ -127,7 +125,7 @@ class Data_Bucket():
 
         if self.shareclass_nav is None:
             self.shareclass_nav = pd.DataFrame()
-            for i in self.get_shareclass_infos(isin="all").index.tolist():
+            for i in self.get_shareclass_infos(isin=ALL).index.tolist():
                 sc_id = self.get_shareclass_infos(info="id", isin=i)
                 sc_curr = self.get_shareclass_infos(info="shareclass_currency",
                                                     isin=i)
@@ -172,20 +170,9 @@ class Data_Bucket():
         else:
             return self.fund_infos[info].iloc[0]
 
-    def get_instruments(self, info=None, indicator=None):
-        """
-        Returns all required info of all instruments associated to the required
-        shareclass or group.
-
-        Args:
-            info (str or [str]): required infos.
-            indicator (["all", str, [str]]): shareclass grouping indicator.
-
-        Returns:
-            pandas.DataFrame: selected infos (if None: all) of the instruments
-            associated to the selected grouping indicators (if None: instruments
-            associated to the current shareclass).
-        """
+    def get_instruments_by_index(self,
+                                 idx,
+                                 info=ALL):
         # get all instruments associated to the subfund
         id_subfund = self.get_shareclass_infos(info="id_subfund")
         if self.instruments is None:
@@ -198,43 +185,52 @@ class Data_Bucket():
         self.instruments["hedge_indicator"].fillna(
             self.get_subfund_infos("subfund_indicator"), inplace=True)
 
-        # if indicator is "all" return the required infos for all instruments
-        # of the subfund.
-        if indicator == "all":
-            if info is None:
-                return self.instruments
-            else:
-                return self.instruments[info]
+        return self.instruments.loc[idx, info]
+        
+    def get_instruments_by_indicator(self,
+                                     info=None,
+                                     indicator=None):
+        indicators = self.get_instruments_by_index(idx=ALL, info="hedge_indicator")
+        index = indicators.loc[indicators.isin(indicator)].index
+
+        return self.get_instruments_by_index(index, info)
+
+    def get_instruments(self, 
+                        info=ALL):
+        """
+        Returns all required info of all instruments associated to the required
+        shareclass or group.
+
+        Args:
+            info (str or [str]): required infos.
+            indicator (str, [str]]): shareclass grouping indicator.
+            index (str, [str]): indexes of required instruments.
+
+        Returns:
+            pandas.DataFrame: selected infos (if None: all) of the instruments
+            associated to the selected grouping indicators (if None: instruments
+            associated to the current shareclass).
+        """
 
         # if indicator is None, return the instruments associated to the current
         # shareclass (i.e: self.shareclass_isin)
         # the corresponding instruments are those associated to the shareclass 
         # itself, to any group the shareclass belongs to and to the whole subfund.
-        elif indicator is None:
-            indicators = self.get_shareclass_infos(info=["shareclass",
-                                                    "shareclass_id"]).tolist()                                        
-            indicators.append(self.get_subfund_infos("subfund_indicator"))
-            indicator = indicators
-        # return selected infos
-        if info is None:
-            return self.instruments.loc[
-                self.instruments["hedge_indicator"].isin(indicator)]
-        else:
-            return self.instruments.loc[
-                self.instruments["hedge_indicator"].isin(indicator),
-                info]
+        indicators = self.get_shareclass_infos(info=["shareclass",
+                                                     "shareclass_id"]).tolist()                                        
+        indicators.append(self.get_subfund_infos("subfund_indicator"))
+        return self.get_instruments_by_indicator(info, indicators)
 
-    def get_instruments_infos(self, info=None, instruments=None):
+    def get_instruments_infos(self, idx=None, info=ALL):
         """
         Feed instruments infos, both data and processed.
 
         Args:
             info ([str, [str], None]): required infos.
-            instruments (["all", str, [str], None]): required instruments index
+            instruments ([str, [str], None]): required instruments index
         """
-
         if self.instruments_infos is None:
-            instrument_id_list = self.get_instruments(indicator="all").index
+            instrument_id_list = self.get_instruments_by_index(idx=ALL).index
             db_instruments_infos = \
                 self.fetcher.fetch_db_instruments_infos(instrument_id_list)
 
@@ -246,31 +242,13 @@ class Data_Bucket():
             self.processor.clean_instruments_infos()
             self.processor.process_instruments_infos()
             self.instruments_infos.index.names = ["instrument"]
-
-        if instruments is None and info is None:
-            return self.instruments_infos.loc[self.get_instruments().index]
-        elif instruments is None:
+        
+        if idx is None:
             return self.instruments_infos.loc[self.get_instruments().index,
                                               info]
-        elif instruments=="all":
-            if info is None:
-                return self.instruments_infos.loc[self.get_instruments(indicator="all").index]
-            else:
-                return self.instruments_infos.loc[self.get_instruments(indicator="all").index,
-                                                  info]
-        elif isinstance(instruments, list):
-            if info is None:
-                return self.instruments_infos.loc[instruments]
-            else:
-                return self.instruments_infos.loc[instruments,
-                                                  info]
         else:
-            if info is None:
-                return self.instruments_infos.loc[instruments]
-            else:
-                return self.instruments_infos.loc[instruments,
-                                                  info].iloc[0]
-                                                
+            return self.instruments_infos.loc[idx, info]
+
     def get_isins_in_group(self, indicator):
         id_subfund = self.get_subfund_infos("id")
 
@@ -290,8 +268,7 @@ class Data_Bucket():
         if self.processing_data is None:
             self.processor.compute_processing_data()
 
-        All = slice(None)
-        vec = self.processing_data.loc[(All, self.shareclass_isin), "distribution"]
+        vec = self.processing_data.loc[(ALL, self.shareclass_isin), "distribution"]
         vec = vec.droplevel("shareclass")
         return vec
 #    
@@ -318,7 +295,7 @@ class Data_Bucket():
 
         return view
     
-    def get_SCR_results(self, submodule):
+    def get_scr_results(self, submodule):
         self.scr = pd.DataFrame(np.nan,
                                 index=self.get_instruments().index,
                                 columns=[FIELDS["97"],
@@ -328,7 +305,7 @@ class Data_Bucket():
                                          FIELDS["102"],
                                          FIELDS["105a"],
                                          FIELDS["105b"]])    
-        self.scr_module.compute_SCR()
+        self.scr_module.compute_scr()
 
         return self.scr[submodule]
         
@@ -405,5 +382,3 @@ TNA of instruments values in subfund currency:   {self.instruments["market_and_a
     instruments:             {instruments}
     instruments infos:       {instruments_infos}
         """
-        #self.instruments = None
-        #self.instruments_infos = None

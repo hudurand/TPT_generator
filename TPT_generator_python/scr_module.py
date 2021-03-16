@@ -1,17 +1,17 @@
 import pandas as pd
 import numpy as np
 
-from .cash_flow import Cash_Flow
+from .cash_flow import CashFlow
 from .constants import FIELDS
 
-class SCR_Module():
+class SCRModule():
     def __init__(self, data_bucket):
         self.data_bucket = data_bucket
-        self.cash_flows = Cash_Flow(self.data_bucket)
+        self.cash_flows = CashFlow(self.data_bucket)
         self.define_parameters()
         self.sym_adj = -0.48
 
-    def compute_total_SCR_market_risk(self):
+    def compute_total_scr_market_risk(self):
         #submodules_list = ["IR", "EQ", "PR", "SP", "CO", "FX"]
 
         return "total SCR market risk"
@@ -44,7 +44,7 @@ class SCR_Module():
     def compute_market_risk_concentrations_submodule(self):
         return "market risk concentration submodule"
 
-    def compute_SCR(self):
+    def compute_scr(self):
         self.compute_97()
         self.compute_98()
         self.compute_99()
@@ -53,19 +53,15 @@ class SCR_Module():
         self.compute_105a()
         self.compute_105b()
 
-    def spread_risk_parameter(self, bond_type, duration, CQS):
+    def spread_risk_parameter(self, bond_type, duration, cqs):
         duration_group = min(duration // 5, 4)
         if bond_type == 1:
-            a, b = self.general_bonds_param[duration_group][CQS]            
+            a, b = self.general_bonds_param[duration_group][cqs]            
         elif bond_type == 2:
-            a, b = self.covered_bonds_param[duration_group][CQS]
+            a, b = self.covered_bonds_param[duration_group][cqs]
         elif bond_type == 3:
-            a, b = self.government_bonds_params[duration_group][CQS]
+            a, b = self.government_bonds_params[duration_group][cqs]
 
-        #print("bond type: ", bond_type)
-        #print("durations: ", duration, duration_group)
-        #print("CQS: ", CQS)
-        #print(a, b)
         return min(a/100 + (b/100) * (duration - duration_group * 5), 1)
 
     def currency_risk_parameter(self, curr1, curr2):

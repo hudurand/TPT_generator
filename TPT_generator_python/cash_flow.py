@@ -1,8 +1,7 @@
 import pandas as pd
-from pathlib import Path
 from timeit import default_timer as timer
 
-class Cash_Flow():
+class CashFlow():
     def __init__(self, data_bucket):
         self.data_bucket = data_bucket
         self.date = data_bucket.date

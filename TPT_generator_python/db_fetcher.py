@@ -6,7 +6,7 @@ from timeit import default_timer as timer
 
 from .constants import DB_INSTRUMENTS_INFOS_MAP
 
-class TPT_Fetcher():
+class TPTFetcher():
     """
     fecther class to fecth data associated 
     to a client or shareclass from database
@@ -19,90 +19,81 @@ class TPT_Fetcher():
                  shareclass_isin=None,
                  source_dir=None):
         self.connector = pyodbc.connect('driver={SQL Server};'
-                                        'Server=DESKTOP-RGN6M86;'
-                                        'Database=intranet;'
-                                        'Trusted_Connection=yes;')
+                                       +'Server=DESKTOP-RGN6M86;'
+                                       +'Database=intranet;'
+                                       +'Trusted_Connection=yes;')
 
         self.source_dir = source_dir
         self.bloomberg_infos = None
-        self.portfolio_NAVs= None
         self.ccy = None
 
     def fetch_shareclass_infos(self, isin):
         if isinstance(isin, list):
             isin = "', '".join(isin)
         query = ('SELECT '
-                 'id, '
-                 'code_isin, '
-                 'shareclass, '
-                 'shareclass_id, '
-                 'shareclass_currency, '
-                 'shareclass_name, '
-                 'id_subfund, '
-                 'type_tpt '
-                 'FROM intranet.dbo.shareclass '
-                 f"WHERE code_isin in('{isin}')")
+                +'id, '
+                +'code_isin, '
+                +'shareclass, '
+                +'shareclass_id, '
+                +'shareclass_currency, '
+                +'shareclass_name, '
+                +'id_subfund, '
+                +'type_tpt '
+                +'FROM intranet.dbo.shareclass '
+                +f"WHERE code_isin in('{isin}')")
 
         return pd.read_sql_query(query, self.connector)
 
     def fetch_isins_in_group(self, id_subfund, indicator):
         query = ('SELECT '
-                 'code_isin '
-                 'FROM intranet.dbo.shareclass '
-                 f"WHERE id_subfund='{id_subfund}' "
-                 f"AND (shareclass_id='{indicator}' "
-                 f"OR shareclass='{indicator}') "
-                 "AND supprime=0")
-        isins = pd.read_sql_query(query,
-                                  self.connector)
+                +'code_isin '
+                +'FROM intranet.dbo.shareclass '
+                +f"WHERE id_subfund='{id_subfund}' "
+                +f"AND (shareclass_id='{indicator}' "
+                +f"OR shareclass='{indicator}') "
+                +"AND supprime=0")
+                
+        isins = pd.read_sql_query(query, self.connector)
 
         return isins["code_isin"].tolist()
                                  
     def fetch_subfund_infos(self, subfund_id):
-        #'fund_issuer_code,'
-        #'fund_issuer_code_type, '
         self.subfund_infos = pd.read_sql_query('SELECT '
-                                               'id, '
-                                               'subfund_name, '
-                                               'subfund_code, '
-                                               'subfund_cic, '
-                                               'subfund_nace, '
-                                               'subfund_lei, '
-                                               'subfund_currency, '
-                                               'id_fund '
-                                               'FROM intranet.dbo.subfund '
-                                               f"WHERE id='{subfund_id}'", 
+                                              +'id, '
+                                              +'subfund_name, '
+                                              +'subfund_code, '
+                                              +'subfund_cic, '
+                                              +'subfund_nace, '
+                                              +'subfund_lei, '
+                                              +'subfund_currency, '
+                                              +'id_fund '
+                                              +'FROM intranet.dbo.subfund '
+                                              +f"WHERE id='{subfund_id}'", 
                                                self.connector)
 
         return self.subfund_infos
 
     def fetch_fund_infos(self, fund_id):
-        #'fund_issuer_group_code, '
-        #'fund_issuer_group_code_type, '
-        #'fund_issuer_group_name, '
-        #'fund_issuer_country, '
-        #'fund_custodian_country, '
-        #'custodian_name '
         fund_infos = pd.read_sql_query('SELECT '
-                                       'fund_name, '
-                                       'fund_issuer_group_code, '
-                                       'fund_country, '
-                                       'depositary_name, '
-                                       'depositary_lei, '
-                                       'depositary_group_name, '
-                                       'depositary_group_lei, '
-                                       'depositary_country, '
-                                       'depositary_nace '
-                                       'FROM intranet.dbo.fund as f '
-                                       'INNER JOIN intranet.dbo.depositary as d '
-                                       'ON f.id_depositary=d.id '
-                                       f"WHERE f.id='{fund_id}'", 
+                                      +'fund_name, '
+                                      +'fund_issuer_group_code, '
+                                      +'fund_country, '
+                                      +'depositary_name, '
+                                      +'depositary_lei, '
+                                      +'depositary_group_name, '
+                                      +'depositary_group_lei, '
+                                      +'depositary_country, '
+                                      +'depositary_nace '
+                                      +'FROM intranet.dbo.fund as f '
+                                      +'INNER JOIN intranet.dbo.depositary as d '
+                                      +'ON f.id_depositary=d.id '
+                                      +f"WHERE f.id='{fund_id}'", 
                                        self.connector)
         fund_infos.rename(columns={"depositary_lei":"fund_issuer_code"}, inplace=True)
         fund_infos["issuer_economic_area"] = pd.read_sql_query('SELECT '
-                                                               'geographic '
-                                                               'FROM intranet.dbo.iso_code '
-                                                               f"WHERE iso_code_2='{fund_infos['fund_country'].iloc[0]}'",
+                                                              +'geographic '
+                                                              +'FROM intranet.dbo.iso_code '
+                                                              +f"WHERE iso_code_2='{fund_infos['fund_country'].iloc[0]}'",
                                                                self.connector)
         return fund_infos
 
@@ -113,15 +104,15 @@ class TPT_Fetcher():
                              date):
 
         nav = pd.read_sql_query('SELECT '
-                                'nav_date, '
-                                'share_price, '
-                                'outstanding_shares, '
-                                'shareclass_total_net_asset, '
-                                'subfund_total_net_asset '
-                                'FROM intranet.dbo.nav '
-                                f"WHERE id_shareclass='{sc_id}' "
-                                f"AND nav_date='{date}' "
-                                f"AND nav_currency='{sc_curr}'",
+                               +'nav_date, '
+                               +'share_price, '
+                               +'outstanding_shares, '
+                               +'shareclass_total_net_asset, '
+                               +'subfund_total_net_asset '
+                               +'FROM intranet.dbo.nav '
+                               +f"WHERE id_shareclass='{sc_id}' "
+                               +f"AND nav_date='{date}' "
+                               +f"AND nav_currency='{sc_curr}'",
                                 self.connector)
         
         nav.rename(columns={"shareclass_total_net_asset":
@@ -129,20 +120,20 @@ class TPT_Fetcher():
                    inplace=True)
 
         nav['shareclass_total_net_asset_sf_curr'] = pd.read_sql_query('SELECT '
-                                                                      'shareclass_total_net_asset '
-                                                                      'FROM intranet.dbo.nav '
-                                                                      f"WHERE id_shareclass='{sc_id}' "
-                                                                      f"AND nav_date='{date}' "
-                                                                      f"AND nav_currency='{sf_curr}'",
+                                                                     +'shareclass_total_net_asset '
+                                                                     +'FROM intranet.dbo.nav '
+                                                                     +f"WHERE id_shareclass='{sc_id}' "
+                                                                     +f"AND nav_date='{date}' "
+                                                                     +f"AND nav_currency='{sf_curr}'",
                                                                       self.connector)    
         return nav
 
     def fetch_subfund_shareclasses(self, id_subfund):
         isins = pd.read_sql_query('SELECT '
-                                  'code_isin '
-                                  'FROM intranet.dbo.shareclass '
-                                  f"WHERE id_subfund='{id_subfund}'"
-                                  "AND supprime=0",
+                                 +'code_isin '
+                                 +'FROM intranet.dbo.shareclass '
+                                 +f"WHERE id_subfund='{id_subfund}'"
+                                 +"AND supprime=0",
                                   self.connector)
 
         return isins["code_isin"].tolist()
@@ -168,51 +159,14 @@ class TPT_Fetcher():
                            "contract_number",
                            "maturity_date"])
 
-        query = f"SELECT {infos} FROM intranet.dbo.portfolio_data d "\
-                +"INNER JOIN portfolio p ON p.id = d.id_portfolio "\
-                +f"WHERE id_subfund='{subfund_id}' "\
-                +f"AND portfolio_date='{date}'"
+        query = (f"SELECT {infos} FROM intranet.dbo.portfolio_data d "
+                +"INNER JOIN portfolio p ON p.id = d.id_portfolio "
+                +f"WHERE id_subfund='{subfund_id}' "
+                +f"AND portfolio_date='{date}'")
 
         instruments = pd.read_sql_query(query,
                                         self.connector)
 
-#        instruments.rename(columns={"asset_id_string":"14_Identification code of the financial instrument"}, inplace=True)
-#        instruments.set_index("14_Identification code of the financial instrument", inplace=True)
-#
-#        if instruments.index.duplicated().any():
-#            fused = pd.DataFrame(columns=["quantity_nominal"
-#                                          "market_and_accrued_fund",
-#                                          "market_fund",
-#                                          "accrued_fund",
-#                                          "market_and_accrued_asset",
-#                                          "market_asset",
-#                                          "accrued_asset"])
-#            fused["quantity_nominal"] = instruments.groupby("14_Identification code of the financial instrument")["quantity_nominal"].sum()
-#            fused["market_and_accrued_fund"] = instruments.groupby("14_Identification code of the financial instrument")["market_and_accrued_fund"].sum()
-#            fused["market_fund"] = instruments.groupby("14_Identification code of the financial instrument")["market_fund"].sum()
-#            fused["accrued_fund"] = instruments.groupby("14_Identification code of the financial instrument")["accrued_fund"].sum()
-#            fused["market_and_accrued_asset"] = instruments.groupby("14_Identification code of the financial instrument")["market_and_accrued_asset"].sum()
-#            fused["market_asset"] = instruments.groupby("14_Identification code of the financial instrument")["market_asset"].sum()
-#            fused["accrued_asset"] = instruments.groupby("14_Identification code of the financial instrument")["accrued_asset"].sum()
-#
-#            instruments = instruments[~instruments.index.duplicated()]
-#            instruments["quantity_nominal"].update(fused["quantity_nominal"])
-#            instruments["market_and_accrued_fund"].update(fused["market_and_accrued_fund"])
-#            instruments["market_fund"].update(fused["market_fund"])
-#            instruments["accrued_fund"].update(fused["accrued_fund"])
-#            instruments["market_and_accrued_asset"].update(fused["market_and_accrued_asset"])
-#            instruments["market_asset"].update(fused["market_asset"])
-#            instruments["accrued_asset"].update(fused["accrued_asset"])
-#
-#        instruments["accrued_fund"].fillna(0, inplace=True)
-#        instruments["accrued_asset"].fillna(0, inplace=True)
-#        
-#        if client == "BIL":
-#            instruments["market_fund"] = instruments["market_and_accrued_fund"] - instruments["accrued_fund"]
-#            instruments["market_asset"] = instruments["market_and_accrued_asset"] - instruments["accrued_asset"]
-#        elif client == "Dynasty":
-#            instruments["market_and_accrued_asset"] = instruments["market_asset"] + instruments["accrued_asset"]
-#        
         return instruments
 
     def fetch_db_instruments_infos(self, id_list):
@@ -225,9 +179,9 @@ class TPT_Fetcher():
 
         codes = "', '".join(id_list)
         infos = ', '.join(DB_INSTRUMENTS_INFOS_MAP.keys())
-        query = f"SELECT {infos} FROM intranet.dbo.instrument i"\
-                +" INNER JOIN iso_code iso ON iso.id = i.id_iso_code"\
-                +f" WHERE identification_code in ('{codes}')"
+        query = (f"SELECT {infos} FROM intranet.dbo.instrument i"
+                +" INNER JOIN iso_code iso ON iso.id = i.id_iso_code"
+                +f" WHERE identification_code in ('{codes}')")
 
         db_instruments_infos = pd.read_sql_query(query,
                                                  self.connector)

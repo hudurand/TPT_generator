@@ -1,5 +1,6 @@
-from TPT_generator_python import TPT_Generator
+from TPT_generator_python import TPTGenerator
 from timeit import default_timer as timer
+from pathlib import Path
 import pandas as pd
 
 if __name__ == "__main__":
@@ -14,11 +15,11 @@ if __name__ == "__main__":
            #"LU1689730718"
            #"LU1689730809"
 
-    SOURCE_DIR = './data'
-    OUTPUT_DIR = './production/Dynasty'
+    SOURCE_DIR = Path('./data')
+    OUTPUT_DIR = Path('./production/Dynasty')
 
     start = timer()
-    g = TPT_Generator(DATE,
+    g = TPTGenerator(DATE,
                       CLIENT,
                       ISIN,
                       SOURCE_DIR,

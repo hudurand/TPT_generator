@@ -7,13 +7,11 @@ import openpyxl
 from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.styles import Alignment
 
-from .db_fetcher import TPT_Fetcher
-from .scr_module import SCR_Module
-from .data_bucket import Data_Bucket
-from .processor import Data_Processor
+from .db_fetcher import TPTFetcher
+from .data_bucket import DataBucket
 from .constants import IN18, FIELDS
 
-class TPT_Generator():
+class TPTGenerator():
     """
     Factory object to generate a TPT report for a shareclass or all shareclass
     of a subfund at a given date.
@@ -47,7 +45,7 @@ class TPT_Generator():
         self.fields = FIELDS
         self.IN18 = IN18
 
-        self.data_bucket = Data_Bucket(date,
+        self.data_bucket = DataBucket(date,
                                        client,
                                        shareclass_isin,
                                        source_dir)
@@ -76,13 +74,12 @@ class TPT_Generator():
         """
         Create an empty pandas dataframe to hold the TPT report to generate.
         """
-        self.TPT_report = pd.DataFrame(index=self.data_bucket.get_instruments().index, columns=self.fields.values(), dtype=object)
+        self.report = pd.DataFrame(index=self.data_bucket.get_instruments().index, columns=self.fields.values(), dtype=object)
     
     def output_excel(self):
         """
         Saves the generated TPT report to an excel file using the AO template.
         """
-        #root_path = Path('./data')
         client = self.data_bucket.client
         isin = self.data_bucket.shareclass_isin
         date = self.data_bucket.date
@@ -90,7 +87,7 @@ class TPT_Generator():
         output_file_name = f"AO_TPT_V5.0_{client}_{isin}_{date}.xlsx"
         template = openpyxl.load_workbook(self.source_dir / template_file_name)
         report = template.get_sheet_by_name('Report')
-        rows = dataframe_to_rows(self.TPT_report, index=False)
+        rows = dataframe_to_rows(self.report, index=False)
 
         column_map = {}
         for row_idx, row in enumerate(rows):
@@ -101,7 +98,6 @@ class TPT_Generator():
                         if report.cell(row=1, column=i+1).value == column_name:
                             #print(column_name, report.cell(row=1, column=i+1).value)
                             column_map[col_idx_pd] = i+1
-                            continue
                     assert col_idx_pd in column_map.keys(), f"Missing {column_name} in template"
                     assert report.cell(row=1, column=column_map[col_idx_pd]).value == row[col_idx_pd]
                 
@@ -121,7 +117,7 @@ class TPT_Generator():
         Check if the fields given as input are filled and fill them if necessary.
         """
         for field in required_fields:
-            if self.TPT_report[self.fields[field]].isnull().values.all():
+            if self.report[self.fields[field]].isnull().values.all():
                 #print(f"fill_column_{field}")
                 getattr(self, f"fill_column_{field}")()
 
@@ -130,15 +126,15 @@ class TPT_Generator():
         Abstracting class to fill fixed instruments speficific informations.
         """
 
-        self.TPT_report[info].update(self.data_bucket.get_instruments_infos(info=info))
+        self.report[info].update(self.data_bucket.get_instruments_infos(info=info))
     
     
-    def fill_SCR(self, submodule):
+    def fill_scr(self, submodule):
         """
         Abstracting class to fill fixed SCR computed values.
         """
 
-        self.TPT_report[submodule].update(self.data_bucket.get_SCR_results(submodule))
+        self.report[submodule].update(self.data_bucket.get_scr_results(submodule))
 
     def fill_column_1(self):
         """
@@ -146,7 +142,7 @@ class TPT_Generator():
         
         Code isin of the shareclass, provided by config.
         """
-        self.TPT_report.loc[:,self.fields["1"]] = self.data_bucket.shareclass_isin
+        self.report.loc[:,self.fields["1"]] = self.data_bucket.shareclass_isin
     
     def fill_column_2(self):
         """
@@ -154,7 +150,7 @@ class TPT_Generator():
 
         Codification chosen to identify the shareclass.
         """
-        self.TPT_report.loc[:,self.fields["2"]] = \
+        self.report.loc[:,self.fields["2"]] = \
             int(self.data_bucket.get_shareclass_infos("type_tpt"))
 
     def fill_column_3(self):
@@ -163,7 +159,7 @@ class TPT_Generator():
 
         Name of the shareclass, obtained from database.
         """
-        self.TPT_report.loc[:,self.fields["3"]] = \
+        self.report.loc[:,self.fields["3"]] = \
             self.data_bucket.get_shareclass_infos("shareclass_name")
     
     def fill_column_4(self):
@@ -172,52 +168,50 @@ class TPT_Generator():
 
         Valuation currency of the portfolio.
         """
-        self.TPT_report.loc[:,self.fields["4"]] = \
+        self.report.loc[:,self.fields["4"]] = \
             self.data_bucket.get_shareclass_infos("shareclass_currency")
 
     def fill_column_5(self):
-        self.TPT_report.loc[:,self.fields["5"]] = \
+        self.report.loc[:,self.fields["5"]] = \
             self.data_bucket.get_shareclass_nav(info="shareclass_total_net_asset_sc_curr")
 
     def fill_column_6(self):
-        self.TPT_report.loc[:,self.fields["6"]] = \
+        self.report.loc[:,self.fields["6"]] = \
             self.data_bucket.get_shareclass_nav("nav_date")
 
     def fill_column_7(self):
-        self.TPT_report.loc[:,self.fields["7"]] = \
+        self.report.loc[:,self.fields["7"]] = \
             self.data_bucket.date.strftime('%Y-%m-%d')
 
     def fill_column_8(self):
-        self.TPT_report.loc[:,self.fields["8"]] = \
+        self.report.loc[:,self.fields["8"]] = \
             self.data_bucket.get_shareclass_nav("share_price")
 
     def fill_column_8b(self):
-        self.TPT_report.loc[:,self.fields["8b"]] = \
+        self.report.loc[:,self.fields["8b"]] = \
             self.data_bucket.get_shareclass_nav("outstanding_shares")
 
     def fill_column_9(self):
         # sum of "XT72" CIC code of the instrument divided by shareclass MV
         # TODO: replace by running bucket at init
         _ = self.data_bucket.get_processing_data("distribution")
-        self.TPT_report[self.fields["9"]] = self.data_bucket.get_shareclass_infos(info="cash") \
+        self.report[self.fields["9"]] = self.data_bucket.get_shareclass_infos(info="cash") \
             / self.data_bucket.get_shareclass_nav(info="shareclass_total_net_asset_sc_curr")
     
     def fill_column_10(self):
-
-        #prod = self.TPT_report[self.fields["30"]] * self.TPT_report[self.fields["91"]]
         product = self.data_bucket.get_processing_data("ME") \
                   / self.data_bucket.get_shareclass_nav(info="shareclass_total_net_asset_sf_curr") \
-                  * self.data_bucket.get_instruments_infos(self.fields["91"])
+                  * self.data_bucket.get_instruments_infos(info=self.fields["91"])
         
         if product.isnull().values.all():
             val = np.nan
         else:
             val = product.sum()
 
-        self.TPT_report[self.fields["10"]] = val
+        self.report[self.fields["10"]] = val
         
     def fill_column_11(self):
-        self.TPT_report[self.fields["11"]] = "Y"
+        self.report[self.fields["11"]] = "Y"
 
     def fill_column_12(self):
         self.fill_instrument_info(self.fields["12"])
@@ -226,9 +220,7 @@ class TPT_Generator():
         self.fill_instrument_info(self.fields["13"])
 
     def fill_column_14(self):
-        #column_14 = self.data_bucket.get_instruments().index
-        
-        self.TPT_report[self.fields["14"]] = self.TPT_report.index
+        self.report[self.fields["14"]] = self.report.index
 
     def fill_column_15(self):
         self.fill_instrument_info(self.fields["15"])
@@ -240,11 +232,10 @@ class TPT_Generator():
         self.fill_instrument_info(self.fields["17"])
     
     def fill_column_17b(self):
+        # Column not used in TPT
         pass
 
     def fill_column_18(self):
-        #assert not self.TPT_report[self.fields["12"]].str.match("..22").any(), "some CIC code ends with 22 and are not supported yet"
-        column_18 = pd.Series(index=self.TPT_report.index)
         column_18 = self.data_bucket.get_instruments("quantity_nominal") \
                     * self.data_bucket.get_distribution_weight()
 
@@ -258,11 +249,9 @@ class TPT_Generator():
                         np.nan,
                         inplace=True)
 
-        self.TPT_report[self.fields["18"]].update(column_18)
+        self.report[self.fields["18"]].update(column_18)
 
     def fill_column_19(self):
-        #assert not self.TPT_report[self.fields["12"]].str.match("..22").any(), "some CIC code ends with 22 and are not supported yet"
-
         column_19 = self.data_bucket.get_instruments("quantity_nominal") \
                       * self.data_bucket.get_distribution_weight()
         
@@ -276,7 +265,7 @@ class TPT_Generator():
                        np.nan,
                        inplace=True)
 
-        self.TPT_report[self.fields["19"]].update(column_19)
+        self.report[self.fields["19"]].update(column_19)
 
     def fill_column_20(self):
         self.fill_instrument_info(self.fields["20"])
@@ -289,19 +278,19 @@ class TPT_Generator():
         column_22 = self.data_bucket.get_instruments("market_and_accrued_asset") \
                     * self.data_bucket.get_distribution_weight()
 
-        self.TPT_report[self.fields["22"]].update(column_22)
+        self.report[self.fields["22"]].update(column_22)
         
     def fill_column_23(self):
         column_23 = self.data_bucket.get_instruments("market_asset") \
                     * self.data_bucket.get_distribution_weight()
 
-        self.TPT_report[self.fields["23"]].update(column_23)
+        self.report[self.fields["23"]].update(column_23)
 
     def fill_column_24(self):
         column_24 = self.data_bucket.get_processing_data("valuation weight") \
                     * self.data_bucket.get_shareclass_nav("shareclass_total_net_asset_sc_curr")
 
-        self.TPT_report[self.fields["24"]].update(column_24)
+        self.report[self.fields["24"]].update(column_24)
 
     def fill_column_25(self):
         
@@ -309,26 +298,22 @@ class TPT_Generator():
                     * self.data_bucket.get_processing_data("distribution weight") \
                     * self.currency_rate
 
-        self.TPT_report[self.fields["25"]].update(column_25.fillna(0))
+        self.report[self.fields["25"]].update(column_25.fillna(0))
 
     def fill_column_26(self):
         column_26 = self.data_bucket.get_processing_data("valuation weight")
 
-        self.TPT_report[self.fields["26"]].update(column_26)
+        self.report[self.fields["26"]].update(column_26)
 
     def fill_column_27(self):
         column_27 = self.data_bucket.get_processing_data("ME") \
                     * self.data_bucket.get_instruments("market_asset") \
                     / self.data_bucket.get_instruments("market_fund")
 
-        self.TPT_report[self.fields["27"]].update(column_27)
+        self.report[self.fields["27"]].update(column_27)
 
     def fill_column_28(self):
-        #column_28 = self.data_bucket.get_processing_data("ME") \
-        #            * self.data_bucket.get_instruments("market_fund") \
-        #            / self.data_bucket.get_instruments("market_asset")
-
-        self.TPT_report[self.fields["28"]] = self.data_bucket.get_processing_data("ME") \
+        self.report[self.fields["28"]] = self.data_bucket.get_processing_data("ME") \
                                              * self.data_bucket.get_shareclass_nav(info="shareclass_total_net_asset_sc_curr") \
                                              / self.data_bucket.get_shareclass_nav(info="shareclass_total_net_asset_sf_curr")
 
@@ -337,9 +322,7 @@ class TPT_Generator():
         pass
 
     def fill_column_30(self):
-#        self.TPT_report[self.fields["30"]] = self.TPT_report[self.fields["28"]] \
-#                                             / self.TPT_report[self.fields["5"]]
-        self.TPT_report[self.fields["30"]] = self.data_bucket.get_processing_data("ME") \
+        self.report[self.fields["30"]] = self.data_bucket.get_processing_data("ME") \
                                              / self.data_bucket.get_shareclass_nav(info="shareclass_total_net_asset_sf_curr")
 
     def fill_column_31(self):
@@ -368,10 +351,10 @@ class TPT_Generator():
 
     def fill_column_39(self):
         self.fill_instrument_info(self.fields["39"])
-        self.TPT_report[self.fields["39"]] = pd.to_datetime(self.TPT_report[self.fields["39"]]).dt.date
-        self.TPT_report[self.fields["39"]] = self.TPT_report[self.fields["39"]].astype('str')
-        self.TPT_report[self.fields["39"]].replace({"2099-12-31" : "9999-12-31"}, inplace=True)
-        self.TPT_report[self.fields["39"]].replace("NaT", np.nan, inplace=True)
+        self.report[self.fields["39"]] = pd.to_datetime(self.report[self.fields["39"]]).dt.date
+        self.report[self.fields["39"]] = self.report[self.fields["39"]].astype('str')
+        self.report[self.fields["39"]].replace({"2099-12-31" : "9999-12-31"}, inplace=True)
+        self.report[self.fields["39"]].replace("NaT", np.nan, inplace=True)
 
     def fill_column_40(self):
         self.fill_instrument_info(self.fields["40"])
@@ -384,8 +367,8 @@ class TPT_Generator():
 
     def fill_column_43(self):
         self.fill_instrument_info(self.fields["43"])
-        self.TPT_report[self.fields["43"]] = pd.to_datetime(self.TPT_report[self.fields["43"]]).astype('str')
-        self.TPT_report[self.fields["43"]].replace("NaT", np.nan, inplace=True)
+        self.report[self.fields["43"]] = pd.to_datetime(self.report[self.fields["43"]]).astype('str')
+        self.report[self.fields["43"]].replace("NaT", np.nan, inplace=True)
 
     def fill_column_44(self):
         self.fill_instrument_info(self.fields["44"])
@@ -402,9 +385,9 @@ class TPT_Generator():
     def fill_column_48(self):
         self.check_required(["47"])
 
-        self.TPT_report[self.fields["48"]] = 9
-        self.TPT_report[self.fields["48"]].where(
-            self.TPT_report[self.fields["47"]].isnull(),
+        self.report[self.fields["48"]] = 9
+        self.report[self.fields["48"]].where(
+            self.report[self.fields["47"]].isnull(),
             1,
             inplace=True)
 
@@ -417,9 +400,9 @@ class TPT_Generator():
     def fill_column_51(self):
         self.check_required(["50"])
 
-        self.TPT_report[self.fields["51"]] = 9
-        self.TPT_report[self.fields["51"]].where(
-            self.TPT_report[self.fields["50"]].isnull(),
+        self.report[self.fields["51"]] = 9
+        self.report[self.fields["51"]].where(
+            self.report[self.fields["50"]].isnull(),
             1,
             inplace=True)
 
@@ -431,9 +414,9 @@ class TPT_Generator():
 
     def fill_column_54(self):
         self.fill_instrument_info(self.fields["54"])
-        self.TPT_report[self.fields["54"]].where(
-            self.TPT_report[self.fields["54"]].str.match("K..."),
-            self.TPT_report[self.fields["54"]].str.get(0),
+        self.report[self.fields["54"]].where(
+            self.report[self.fields["54"]].str.match("K..."),
+            self.report[self.fields["54"]].str.get(0),
             inplace=True)
 
     def fill_column_55(self):
@@ -459,10 +442,7 @@ class TPT_Generator():
 
     def fill_column_61(self):
         self.fill_instrument_info(self.fields["61"])
-        #column_61 = self.data_bucket.get_processing_data("61_Strike price")
-
-        #self.TPT_report[self.fields["61"]].update(column_61)
-
+        
     def fill_column_62(self):
         self.fill_instrument_info(self.fields["62"])
 
@@ -566,22 +546,22 @@ class TPT_Generator():
         pass
     
     def fill_column_97(self):
-        self.fill_SCR(self.fields["97"])
+        self.fill_scr(self.fields["97"])
 
     def fill_column_98(self):
-        self.fill_SCR(self.fields["98"])
+        self.fill_scr(self.fields["98"])
 
     def fill_column_99(self):
-        self.fill_SCR(self.fields["99"])
+        self.fill_scr(self.fields["99"])
 
     def fill_column_100(self):
-        self.fill_SCR(self.fields["100"])
+        self.fill_scr(self.fields["100"])
     
     def fill_column_101(self):
         pass
 
     def fill_column_102(self):
-        self.fill_SCR(self.fields["102"])
+        self.fill_scr(self.fields["102"])
     
     def fill_column_103(self):
         pass
@@ -593,10 +573,10 @@ class TPT_Generator():
         pass
 
     def fill_column_105a(self):
-        self.fill_SCR(self.fields["105a"])
+        self.fill_scr(self.fields["105a"])
 
     def fill_column_105b(self):
-        self.fill_SCR(self.fields["105b"])
+        self.fill_scr(self.fields["105b"])
 
     def fill_column_106(self):
         pass
@@ -625,65 +605,65 @@ class TPT_Generator():
     def fill_column_114(self):
         self.check_required(["13"])
 
-        self.TPT_report[self.fields["114"]] = \
-            self.TPT_report[self.fields["13"]].where(
-                self.TPT_report[self.fields["13"]] != 0)
+        self.report[self.fields["114"]] = \
+            self.report[self.fields["13"]].where(
+                self.report[self.fields["13"]] != 0)
 
     def fill_column_115(self):
-        self.TPT_report.loc[:,self.fields["115"]] = \
+        self.report.loc[:,self.fields["115"]] = \
             self.data_bucket.get_subfund_infos("subfund_lei")
 
     def fill_column_116(self):
         
         self.check_required(["115"])
 
-        self.TPT_report[self.fields["116"]] = 9
-        self.TPT_report[self.fields["116"]].where(
-            self.TPT_report[self.fields["115"]].isnull(),
+        self.report[self.fields["116"]] = 9
+        self.report[self.fields["116"]].where(
+            self.report[self.fields["115"]].isnull(),
             1,
             inplace=True)
 
     def fill_column_117(self):
-        self.TPT_report.loc[:,self.fields["117"]] = \
+        self.report.loc[:,self.fields["117"]] = \
             self.data_bucket.get_subfund_infos("subfund_name")
 
     def fill_column_118(self):
-        self.TPT_report.loc[:,self.fields["118"]] = \
+        self.report.loc[:,self.fields["118"]] = \
             self.data_bucket.get_subfund_infos("subfund_nace")
 
     def fill_column_119(self):
-        self.TPT_report.loc[:,self.fields["119"]] = \
+        self.report.loc[:,self.fields["119"]] = \
             self.data_bucket.get_fund_infos("fund_issuer_group_code")
 
     def fill_column_120(self):
         
         self.check_required(["119"])
 
-        self.TPT_report[self.fields["120"]] = 9
-        self.TPT_report[self.fields["120"]].where(
-            self.TPT_report[self.fields["119"]].isnull(),
+        self.report[self.fields["120"]] = 9
+        self.report[self.fields["120"]].where(
+            self.report[self.fields["119"]].isnull(),
             1,
             inplace=True)
     def fill_column_121(self):
-        self.TPT_report.loc[:,self.fields["121"]] = \
+        self.report.loc[:,self.fields["121"]] = \
             self.data_bucket.get_fund_infos("fund_name")
 
     def fill_column_122(self):
-        self.TPT_report.loc[:,self.fields["122"]] = \
+        self.report.loc[:,self.fields["122"]] = \
             self.data_bucket.get_fund_infos("fund_country")
 
     def fill_column_123(self):
-        self.TPT_report.loc[:,self.fields["123"]] = \
+        self.report.loc[:,self.fields["123"]] = \
             self.data_bucket.get_subfund_infos("subfund_cic")
 
     def fill_column_123a(self):
-        self.TPT_report.loc[:,self.fields["123a"]] = \
+        self.report.loc[:,self.fields["123a"]] = \
             self.data_bucket.get_fund_infos("depositary_country")
 
     def fill_column_124(self):
         self.check_required(["10"])
 
-        self.TPT_report[self.fields["124"]] = self.TPT_report[self.fields["10"]]
+        self.report[self.fields["124"]] = self.report[self.fields["10"]]
 
     def fill_column_125(self):
         column_125 = self.data_bucket.get_instruments("accrued_asset") \
@@ -691,8 +671,8 @@ class TPT_Generator():
                      * self.data_bucket.get_distribution_weight() \
                      / self.data_bucket.get_instruments("market_and_accrued_asset")
 
-        self.TPT_report[self.fields["125"]].update(column_125)
-        self.TPT_report[self.fields["125"]].fillna(0, inplace=True)
+        self.report[self.fields["125"]].update(column_125)
+        self.report[self.fields["125"]].fillna(0, inplace=True)
 
     def fill_column_126(self):
         column_126 = self.data_bucket.get_instruments("accrued_fund") \
@@ -700,16 +680,16 @@ class TPT_Generator():
                     * self.data_bucket.get_shareclass_nav("shareclass_total_net_asset_sc_curr") \
                      / self.data_bucket.get_instruments("market_and_accrued_fund") 
 
-        self.TPT_report[self.fields["126"]].update(column_126)
-        self.TPT_report[self.fields["126"]].fillna(0, inplace=True)
+        self.report[self.fields["126"]].update(column_126)
+        self.report[self.fields["126"]].fillna(0, inplace=True)
 
     def fill_column_127(self):
         self.fill_instrument_info(self.fields["127"])
-        self.TPT_report[self.fields["127"]].replace("-", np.nan, inplace=True)
+        self.report[self.fields["127"]].replace("-", np.nan, inplace=True)
 
     def fill_column_128(self):
         self.fill_instrument_info(self.fields["128"])
-        self.TPT_report[self.fields["128"]].replace("-", np.nan, inplace=True)
+        self.report[self.fields["128"]].replace("-", np.nan, inplace=True)
     
     def fill_column_129(self):
         pass
@@ -720,13 +700,13 @@ class TPT_Generator():
     def fill_column_131(self):
         column_131 = self.data_bucket.get_processing_data(self.fields["131"])
 
-        self.TPT_report[self.fields["131"]].update(column_131)
+        self.report[self.fields["131"]].update(column_131)
 
     def fill_column_132(self):
         pass
 
     def fill_column_133(self):
-        self.TPT_report.loc[:,self.fields["133"]] = \
+        self.report.loc[:,self.fields["133"]] = \
             self.data_bucket.get_fund_infos("depositary_name")
 
     def fill_column_134(self):
@@ -742,4 +722,4 @@ class TPT_Generator():
         self.fill_instrument_info(self.fields["137"])
 
     def fill_column_1000(self):
-        self.TPT_report[self.fields["1000"]] = "V5.0"
+        self.report[self.fields["1000"]] = "V5.0"
