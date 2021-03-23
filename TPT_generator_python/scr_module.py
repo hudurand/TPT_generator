@@ -114,41 +114,19 @@ class SCRModule():
     def compute_99(self):
         self.data_bucket.scr[FIELDS["99"]] = \
             self.data_bucket.get_processing_data([FIELDS["12"],
+                                                  FIELDS["21"],
+                                                  FIELDS["71"],
                                                   FIELDS["131"],
-                                                 "valuation weight"]).apply(
+                                                  "ME"]).apply(
                 lambda row: self.shock_down_type1(row), axis=1)
 #        self.data_bucket.scr[FIELDS["99"]] = \
 #            self.data_bucket.get_instruments_infos().apply(
 #                lambda row: self.shock_down_type1(row), axis=1)
 
     def shock_down_type1(self, row):
-        if row[FIELDS["131"]] == "3L":
-            return row["valuation weight"] * (0.39 + self.sym_adj/100)
-
-        elif row[FIELDS["12"]][2:] == "22":
-            if not pd.isnull(row[FIELDS["71"]]):
-                main_ccy = row[FIELDS["21"]]
-                underlying_ccy = row[FIELDS["71"]]
-            
-                if main_ccy != underlying_ccy:
-                    EX = self.data_bucket.fetcher.ccy[main_ccy + underlying_ccy]
-                else: 
-                    EX = 1
-
-            else: 
-                EX = 1
-                
-            E = row[FIELDS["5"]]
-            T = row[FIELDS["18"]]
-            U = row[FIELDS["19"]]
-            AA = row[FIELDS["23"]]
-            AE = row[FIELDS["25"]]
-            BS = row[FIELDS["61"]]
-            CC = row[FIELDS["72"]]
-            CX = row[FIELDS["93"]]
-
-            return ((T + U) / BS * CC * EX * (CX / E) * (AE / AA)) * (0.39 + self.sym_adj/100)
-
+        if (row[FIELDS["131"]] == "3L"
+            or row[FIELDS["12"]][2:] == "22"):
+            return row["ME"] * (0.39 + self.sym_adj/100)
         else:
             return 0
 

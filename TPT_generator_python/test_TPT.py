@@ -112,8 +112,8 @@ def reference_report(params_fixt):
     report.replace({"Dynasty Corporate Bonds 0 - 2.5 Class B": "Dynasty Corporate Bonds 0-2.5 B EUR"}, regex=True, inplace=True)
     report.replace({"Subscription tax IEH": "Subscription tax"}, regex=True, inplace=True)
     report.replace({"Subscription tax I": "Subscription tax"}, regex=True, inplace=True)
-    report.replace({"VERSE": "1"}, regex=True, inplace=True)
-    report.replace({"RECU": "2"}, regex=True, inplace=True)
+    report.replace({"VERSE": "sell"}, regex=True, inplace=True)
+    report.replace({"RECU": "buy"}, regex=True, inplace=True)
     report.replace({"RBC Investor Services Bank S.A.": "RBC Luxembourg"}, regex=True, inplace=True)
     report["125_Accrued Income (Security Denominated Currency)"].fillna(0, inplace=True)
     report["126_Accrued Income (Portfolio Denominated Currency)"].fillna(0, inplace=True)
@@ -150,7 +150,7 @@ def reference_report(params_fixt):
 def data_bucket(params_fixt):
     CLIENT, ISIN, DATE, _ = params_fixt
     SOURCE_DIR = Path('./data')
-    b = DataBucket(DATE, CLIENT, ISIN, SOURCE_DIR)
+    b = DataBucket(DATE, CLIENT, SOURCE_DIR, ISIN)
     b.fetch()
 
     return b
@@ -166,10 +166,11 @@ def generator(params_fixt):
     OUTPUT_DIR = Path('./TEST_DIR')
     DATE = pd.to_datetime(DATE).date()
     g = TPTGenerator(DATE,
-                      CLIENT,
-                      ISIN,
-                      SOURCE_DIR,
-                      OUTPUT_DIR)
+                     CLIENT,
+                     OUTPUT_DIR,
+                     SOURCE_DIR,
+                     sym_adj=0.48,
+                     shareclass_isin=ISIN)
     
     return g
 

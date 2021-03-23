@@ -1,9 +1,15 @@
-# General principles
-## Production cycle
-## Reporting data
+# Details of TPT solvency II methodology
+## Required data
 
-# TPT Solvency II reporting
-## Input data
+* [ ] Client's Portfolio
+* [ ] Client's Net asset valuation at shareclass level (currency of shareclass and subfund)
+* [ ] Client's infos (client, fund, subfund, shareclasses)
+* [ ] Instruments' infos (AODB/instrument table)
+* [ ] actualisation rates
+* [ ] symmetric adjustment 
+* [ ] date
+* [ ] currency rates
+
 ## Sections
 
 The TPT_report can be divided into a number of sections which are filled with different type of data:
@@ -21,32 +27,193 @@ The TPT_report can be divided into a number of sections which are filled with di
 
     - SCR columns which are computed by a dedicated module.
 
-- Portfolio characteristics and valuation [1-11]  
- Shareclass related informations.
+???  "Portfolio characteristics and valuation [1-11]"
+    === "Methodology"
+        Shareclass related informations
 
-- Instrument codification [12-17]
- 
-- Valuation and exposures [17b-31]
+        For funds with an ISIN code, the ISIN code is reported.  
+        Otherwise, we will report one of the other recognised codes such as:  
 
-- Instrument characteristics and analytics
-    - Interest rate instruments characteristics [32-45]
-    - Issuer data [46-59]
-    - Additional characteristics for derivatives [60-65]
-    - Derivatives / additional characteristics of the underlying asset [67-89]
-    - Analytics [90-94b]
+        * a CUSIP  
+        * Bloomberg Ticker 
+        * Reuters RIC  
+        * a code attributed by the undertaking  
 
-- Transparency [95]
+    === "Required data"
 
-- Indicative contributions to SCR (instrument level) [97-105b]
+        | table | fields |
+        |---|---|
+        |shareclass | code_isin |
 
-- Additional information instruments [106-114]
+    === "Code"
+        * [TPTGenerator.fill_column_1](http://127.0.0.1:8000/reference/#TPT_generator_python.TPT_generator.TPTGenerator)
 
-- Additional information portfolio characteristics [115-126]
 
-- Specific data for convertible bonds [127-128]
 
-- Specific data in case no yield curve of reference is available [129-131]
+??? "Instrument codification [12-17]"
+    === "Methodology"
 
-- Additional fields / additional information [133-135]
+    === "Required data"
 
-- additional counterparty information [137]
+        | table | fields |
+        |---|---|
+
+
+    === "Code"
+
+??? "Valuation and exposures [17b-31]"
+    === "Methodology"
+
+    === "Required data"
+
+        | table | fields |
+        |---|---|
+
+
+    === "Code"
+
+??? "Instrument characteristics and analytics [32-94b]" 
+    ??? "Interest rate instruments characteristics [32-45]"
+        === "Methodology"
+
+        === "Required data"
+
+            | table | fields |
+            |---|---|
+
+        === "Code"
+        
+    ??? "Issuer data [46-59]"
+        === "Methodology"
+
+        === "Required data"
+
+            | table | fields |
+            |---|---|
+
+        === "Code"
+
+    ??? "Additional characteristics for derivatives [60-65]"
+        === "Methodology"
+
+        === "Required data"
+
+            | table | fields |
+            |---|---|
+
+        === "Code"
+
+    ??? "Derivatives / additional characteristics of the underlying asset [67-89]"
+        === "Methodology"
+
+        === "Required data"
+
+            | table | fields |
+            |---|---|
+
+        === "Code"
+
+    ??? "Analytics [90-94b]"
+        === "Methodology"
+
+        === "Required data"
+
+            | table | fields |
+            |---|---|
+
+        === "Code"
+
+??? "Transparency [95]"
+    === "Methodology"
+
+    === "Required data"
+
+        | table | fields |
+        |---|---|
+
+
+    === "Code"
+
+
+??? "Indicative contributions to SCR (instrument level) [97-105b]"
+    === "Methodology"
+
+    === "Required data"
+
+        | table | fields |
+        |---|---|
+
+
+    === "Code"
+
+
+??? "Additional information instruments [106-114]"
+    === "Methodology"
+
+    === "Required data"
+
+        | table | fields |
+        |---|---|
+
+
+    === "Code"
+
+
+??? "Additional information portfolio characteristics [115-126]"
+    === "Methodology"
+
+    === "Required data"
+
+        | table | fields |
+        |---|---|
+
+
+    === "Code"
+
+
+??? "Specific data for convertible bonds [127-128]"
+    === "Methodology"
+
+    === "Required data"
+
+        | table | fields |
+        |---|---|
+
+
+    === "Code"
+
+
+??? "Specific data in case no yield curve of reference is available [129-131]"
+    === "Methodology"
+
+    === "Required data"
+
+        | table | fields |
+        |---|---|
+
+
+    === "Code"
+
+
+??? "Additional fields / additional information [133-135]"
+    === "Methodology"
+
+    === "Required data"
+
+        | table | fields |
+        |---|---|
+
+
+    === "Code"
+
+
+??? "additional counterparty information [137]"
+    === "Methodology"
+
+    === "Required data"
+
+        | table | fields |
+        |---|---|
+
+
+    === "Code"

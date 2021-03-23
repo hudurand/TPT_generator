@@ -5,16 +5,8 @@ import pandas as pd
 
 if __name__ == "__main__":
     DATE = pd.to_datetime("2020-12-31").date()
-    CLIENT = "BIL"
-    #ISIN = #"LU1689729546"
-    ISIN = "LU1689732417"
-           #"LU1689729546"
-           #"LU1689729629"
-           #"LU1808854803"
-           #"LU1689730122"
-           #"LU1689730718"
-           #"LU1689730809"
-
+    CLIENT = "Pictet"
+    ISIN = "LU1787059465"
     SOURCE_DIR = Path('./data')
     OUTPUT_DIR = Path('./production/Dynasty')
 
@@ -25,11 +17,9 @@ if __name__ == "__main__":
                       SOURCE_DIR,
                       OUTPUT_DIR)
 
-    #g.fill_column_19()
-    #print(g.cash_flows)
-    #{g.create_empty_report()
     g.generate()
-    #g.output_excel()
-    #print(g.TPT_report[g.fields["19"]])
+    print(g)
+    g.output_excel()
+
     end = timer()
     print(end - start)

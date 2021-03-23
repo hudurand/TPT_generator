@@ -1,12 +1,18 @@
 date: '2020-12-31'
 symmetric_adjustment: -0.48
 source_dir: './data'
-clients: 
-    Dynasty:
+output_dir: './production/Dynasty'
+client: 'Dynasty'
+reports:
+    TPT:
         shareclasses: 
-            - "LU2133138276"
-        output_dir: './production/Dynasty'
-#    Dynasty:
-#        shareclasses: 
-#            - ''
-#        output_dir: './production/Dynasty'
+            - LU2133138276
+            - LU2133138433
+            - LU1280365476
+            - LU1280365393
+            - LU1280365559
+            - LU1483663818
+            - LU1280365633
+            - LU1840818220
+            - LU1586705938
+            - LU1508332993

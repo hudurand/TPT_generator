@@ -6,6 +6,8 @@ from pathlib import Path
 import openpyxl
 from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.styles import Alignment
+from timeit import default_timer as timer
+import logging
 
 from .db_fetcher import TPTFetcher
 from .data_bucket import DataBucket
@@ -13,8 +15,8 @@ from .constants import IN18, FIELDS
 
 class TPTGenerator():
     """
-    Factory object to generate a TPT report for a shareclass or all shareclass
-    of a subfund at a given date.
+    Factory object to generate a TPT report for a shareclass or all specified 
+    shareclasses of a subfund at a given date.
    
     It relies on the Data_Bucket object to feed it the data required to fill
     the report (and perform minor operation on the data?) to fill the columns
@@ -29,45 +31,116 @@ class TPTGenerator():
 
     def __init__(self,
                  date,
-                 client=None,
-                 shareclass_isin=None,
-                 source_dir=None,
-                 output_dir=None,
-                 sym_adj=0):
+                 client,
+                 output_dir,
+                 source_dir,
+                 sym_adj=0,
+                 shareclass_isin=None):
         """
         Initialise report-specific attributes helper objects.
         """
+        # Initialise logger object
+        self.logger = logging.getLogger(__name__)
+        self.logger.info("Initialising Generator...")
 
+        # set in/out directories (in should be removed in future)
         self.source_dir = Path(source_dir)
         self.output_dir = Path(output_dir)
         
+        # set generation constants
         self.sym_adj = sym_adj
-        self.fields = FIELDS
-        self.IN18 = IN18
+        self.fields = FIELDS # set as attribute or global constant?
+        self.IN18 = IN18 # idem?
 
-        self.data_bucket = DataBucket(date,
-                                       client,
-                                       shareclass_isin,
-                                       source_dir)
+        # instanciate DataBucket depending on production mode 
+        # (single or multiple shareclasses)
+        if shareclass_isin:
+            self.data_bucket = DataBucket(date,
+                                           client,
+                                           source_dir,
+                                           shareclass_isin)
 
-        self.currency_rate = self.data_bucket.get_shareclass_nav(info="shareclass_total_net_asset_sc_curr") \
-                             / self.data_bucket.get_shareclass_nav(info="shareclass_total_net_asset_sf_curr")
-        
-        self.create_empty_report()
+            self.create_empty_report()
+        else:
+            self.data_bucket = DataBucket(date,
+                                          client,
+                                          source_dir)
+            self.report = None
+
+        self.logger.info('Generator initialiased')
+        self.logger.debug(self)
 
     def __repr__(self):
+        """
+        overload __repr__ function for logging and easier debugging.
+        """
+        if self.report:
+            n = self.report.shape[0]
+        else:
+            n = self.report
+
         return f"""
     Reporting date:          {self.data_bucket.date}
     Client:                  {self.data_bucket.client}
     Shareclass isin:         {self.data_bucket.shareclass_isin} 
+    number of instruments:   {n}
         """
 
-    def generate(self):
+    def generate(self, shareclass_isin=None):
         """
         Generate the report by calling the filling methods for all columns.
         """
+        
+        assert (self.data_bucket.shareclass_isin
+                or shareclass_isin), "no shareclass to produce specified."
+        
+        self.logger.info("Begin generation")
+
+        if isinstance(shareclass_isin, list):
+            self.logger.info("Generating from list of shareclass")
+            self.logger.debug(shareclass_isin)
+
+            for isin in shareclass_isin:
+                #start = timer()
+                # set working isin
+                self.data_bucket.update(isin)
+                
+                # initialise empty dataframe as report placeholder
+                self.create_empty_report()
+                
+                # trigger generation of report
+                self.fill_report()
+
+                # save generated report
+                self.output_excel()
+                #end = timer()
+                #print(end - start)
+
+        else:
+            
+            self.logger.info("generating a single shareclass")
+            self.logger.debug(shareclass_isin)
+
+            if isinstance(shareclass_isin, str):
+                # set working isin if not specified at init
+                self.data_bucket.update(shareclass_isin)
+                self.create_empty_report()
+            
+            # trigger generation of report
+            self.fill_report()
+
+            # save generated report
+            self.output_excel()
+
+    def fill_report(self):
+
+        self.logger.info("Filling report")
+
+        # call filling method for each column
         for field in self.fields:
             #print(f"fill_column_{field}...")
+            self.logger.debug(f"Fill_column_{field}")
+
             getattr(self, f"fill_column_{field}")()
 
     def create_empty_report(self):
@@ -80,6 +153,10 @@ class TPTGenerator():
         """
         Saves the generated TPT report to an excel file using the AO template.
         """
+
+        self.logger.info("writing excel")
+        self.logger.debug(self)
+
         client = self.data_bucket.client
         isin = self.data_bucket.shareclass_isin
         date = self.data_bucket.date
@@ -275,13 +352,13 @@ class TPTGenerator():
 
     def fill_column_22(self):
 
-        column_22 = self.data_bucket.get_instruments("market_and_accrued_asset") \
+        column_22 = self.data_bucket.get_instruments("market_value_asset") \
                     * self.data_bucket.get_distribution_weight()
 
         self.report[self.fields["22"]].update(column_22)
         
     def fill_column_23(self):
-        column_23 = self.data_bucket.get_instruments("market_asset") \
+        column_23 = self.data_bucket.get_instruments("clear_value_asset") \
                     * self.data_bucket.get_distribution_weight()
 
         self.report[self.fields["23"]].update(column_23)
@@ -294,9 +371,9 @@ class TPTGenerator():
 
     def fill_column_25(self):
         
-        column_25 = self.data_bucket.get_instruments("market_fund") \
+        column_25 = self.data_bucket.get_instruments("clear_value_fund") \
                     * self.data_bucket.get_processing_data("distribution weight") \
-                    * self.currency_rate
+                    * self.data_bucket.get_shareclass_nav("rate")
 
         self.report[self.fields["25"]].update(column_25.fillna(0))
 
@@ -307,8 +384,8 @@ class TPTGenerator():
 
     def fill_column_27(self):
         column_27 = self.data_bucket.get_processing_data("ME") \
-                    * self.data_bucket.get_instruments("market_asset") \
-                    / self.data_bucket.get_instruments("market_fund")
+                    * self.data_bucket.get_instruments("clear_value_asset") \
+                    / self.data_bucket.get_instruments("clear_value_fund")
 
         self.report[self.fields["27"]].update(column_27)
 
@@ -657,8 +734,9 @@ class TPTGenerator():
             self.data_bucket.get_subfund_infos("subfund_cic")
 
     def fill_column_123a(self):
-        self.report.loc[:,self.fields["123a"]] = \
-            self.data_bucket.get_fund_infos("depositary_country")
+        pass
+    #    self.report.loc[:,self.fields["123a"]] = \
+    #        self.data_bucket.get_fund_infos("depositary_country")
 
     def fill_column_124(self):
         self.check_required(["10"])
@@ -667,9 +745,9 @@ class TPTGenerator():
 
     def fill_column_125(self):
         column_125 = self.data_bucket.get_instruments("accrued_asset") \
-                     * self.data_bucket.get_instruments("market_and_accrued_asset") \
+                     * self.data_bucket.get_instruments("market_value_asset") \
                      * self.data_bucket.get_distribution_weight() \
-                     / self.data_bucket.get_instruments("market_and_accrued_asset")
+                     / self.data_bucket.get_instruments("market_value_asset")
 
         self.report[self.fields["125"]].update(column_125)
         self.report[self.fields["125"]].fillna(0, inplace=True)
@@ -678,7 +756,7 @@ class TPTGenerator():
         column_126 = self.data_bucket.get_instruments("accrued_fund") \
                      * self.data_bucket.get_processing_data("valuation weight") \
                     * self.data_bucket.get_shareclass_nav("shareclass_total_net_asset_sc_curr") \
-                     / self.data_bucket.get_instruments("market_and_accrued_fund") 
+                     / self.data_bucket.get_instruments("market_value_fund") 
 
         self.report[self.fields["126"]].update(column_126)
         self.report[self.fields["126"]].fillna(0, inplace=True)
@@ -706,8 +784,9 @@ class TPTGenerator():
         pass
 
     def fill_column_133(self):
-        self.report.loc[:,self.fields["133"]] = \
-            self.data_bucket.get_fund_infos("depositary_name")
+        pass
+        #self.report.loc[:,self.fields["133"]] = \
+        #    self.data_bucket.get_fund_infos("depositary_name")
 
     def fill_column_134(self):
         pass

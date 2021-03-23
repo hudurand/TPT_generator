@@ -1,0 +1,14 @@
+date: '2020-12-31'
+symmetric_adjustment: -0.48
+source_dir: './data'
+output_dir: './production/Pictet'
+client: 'Pictet'
+reports:
+    TPT:
+        shareclasses: 
+            - LU1787059465
+            - LU1787059036
+            - LU1787061107
+            - LU1787061362
+            - LU1787061529
+            - LU1787060471

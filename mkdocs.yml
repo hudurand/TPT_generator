@@ -1,8 +1,10 @@
-site_name: TPT generator doc
+site_name: Reporting
 nav:
     - Overview: index.md
-    - Methodology: methodology.md
     - Developer guide: developer.md
+    - TPT Solvency II:
+        - Methodology: methodology.md
+        - Implementation: implementation.md
     - Reference: reference.md
 theme:
     name: "material"
@@ -18,3 +20,10 @@ markdown_extensions:
     - pymdownx.emoji:
         emoji_index: !!python/name:materialx.emoji.twemoji
         emoji_generator: !!python/name:materialx.emoji.to_svg
+    - attr_list
+    - pymdownx.tabbed
+    - pymdownx.details
+    - pymdownx.superfences
+    - pymdownx.tasklist:
+        custom_checkbox: true
+        clickable_checkbox: true

@@ -2,6 +2,7 @@ import pyodbc
 from pathlib import Path
 import pandas as pd
 import numpy as np
+import logging
 from timeit import default_timer as timer
 
 from .constants import DB_INSTRUMENTS_INFOS_MAP
@@ -14,10 +15,9 @@ class TPTFetcher():
     """
 
     def __init__(self,
-                 date,
-                 client=None,
-                 shareclass_isin=None,
                  source_dir=None):
+        self.logger = logging.getLogger(__name__)
+        self.logger.info("Initialising fetcher...")
         self.connector = pyodbc.connect('driver={SQL Server};'
                                        +'Server=DESKTOP-RGN6M86;'
                                        +'Database=intranet;'
@@ -27,7 +27,11 @@ class TPTFetcher():
         self.bloomberg_infos = None
         self.ccy = None
 
+        self.logger.info("Fetcher initialised")
+
     def fetch_shareclass_infos(self, isin):
+        self.logger.info("Fetching shareclasses infos")
+
         if isinstance(isin, list):
             isin = "', '".join(isin)
         query = ('SELECT '
@@ -43,22 +47,34 @@ class TPTFetcher():
                 +f"WHERE code_isin in('{isin}')")
 
         return pd.read_sql_query(query, self.connector)
-
-    def fetch_isins_in_group(self, id_subfund, indicator):
+    
+    def fetch_group_map(self, id_list):
+        id_list = "', '".join([str(id) for id in id_list])
         query = ('SELECT '
-                +'code_isin '
-                +'FROM intranet.dbo.shareclass '
-                +f"WHERE id_subfund='{id_subfund}' "
-                +f"AND (shareclass_id='{indicator}' "
-                +f"OR shareclass='{indicator}') "
-                +"AND supprime=0")
-                
-        isins = pd.read_sql_query(query, self.connector)
+                +'group_id, '
+                +'shareclass_id '
+                +'FROM intranet.dbo.shareclass_group '
+                +f"WHERE shareclass_id in ('{id_list}')")
+            
+        return pd.read_sql_query(query, self.connector)
 
-        return isins["code_isin"].tolist()
+#    def fetch_isins_in_group(self, id_subfund, id_group):
+#        query = ('SELECT '
+#                +'code_isin '
+#                +'FROM intranet.dbo.shareclass '
+#                +f"WHERE id_subfund='{id_subfund}' "
+#                +f"AND (shareclass_id='{indicator}' "
+#                +f"OR shareclass='{indicator}') "
+#                +"AND supprime=0")
+#                
+#        isins = pd.read_sql_query(query, self.connector)
+#
+#        return isins["code_isin"].tolist()
                                  
     def fetch_subfund_infos(self, subfund_id):
-        self.subfund_infos = pd.read_sql_query('SELECT '
+        self.logger.info("Fetching subfund infos")
+        
+        subfund_infos = pd.read_sql_query('SELECT '
                                               +'id, '
                                               +'subfund_name, '
                                               +'subfund_code, '
@@ -71,9 +87,11 @@ class TPTFetcher():
                                               +f"WHERE id='{subfund_id}'", 
                                                self.connector)
 
-        return self.subfund_infos
+        return subfund_infos
 
     def fetch_fund_infos(self, fund_id):
+        self.logger.info("Fetching fund infos")
+        
         fund_infos = pd.read_sql_query('SELECT '
                                       +'fund_name, '
                                       +'fund_issuer_group_code, '
@@ -102,6 +120,7 @@ class TPTFetcher():
                              sc_curr,
                              sf_curr,
                              date):
+        self.logger.info(f"Fetching shareclasses nav {sc_id}")
 
         nav = pd.read_sql_query('SELECT '
                                +'nav_date, '
@@ -129,6 +148,8 @@ class TPTFetcher():
         return nav
 
     def fetch_subfund_shareclasses(self, id_subfund):
+        self.logger.info("Fetching all shareclasses in subfund")
+
         isins = pd.read_sql_query('SELECT '
                                  +'code_isin '
                                  +'FROM intranet.dbo.shareclass '
@@ -142,22 +163,24 @@ class TPTFetcher():
         # "rating_moodys",
         # "rating_sp",
         # "rating_fitch"
+        # "hedge_indicator",
+        self.logger.info("Fetching all instruments in portfolio")
+
         infos = ', '.join(["asset_id_string",
-                           "hedge_indicator",
                            "asset_name",
                            "asset_type",
-                           "asset_type_3",
                            "asset_currency",
                            "quantity_nominal",
-                           "price_market",
-                           "market_asset",
-                           "market_fund",
+                           "market_price",
+                           "clear_value_asset",
+                           "clear_value_fund",
                            "accrued_asset",
                            "accrued_fund",
-                           "market_and_accrued_fund",
-                           "market_and_accrued_asset",
-                           "contract_number",
-                           "maturity_date"])
+                           "market_value_fund",
+                           "market_value_asset",
+                           "maturity_date",
+                           "grouping_id",
+                           "id_group"])
 
         query = (f"SELECT {infos} FROM intranet.dbo.portfolio_data d "
                 +"INNER JOIN portfolio p ON p.id = d.id_portfolio "
@@ -177,6 +200,8 @@ class TPTFetcher():
         self.fetch_missing_infos(id_list)
         #######################################################################
 
+        self.logger.info("Fetching infos of instruments in portfolio")
+
         codes = "', '".join(id_list)
         infos = ', '.join(DB_INSTRUMENTS_INFOS_MAP.keys())
         query = (f"SELECT {infos} FROM intranet.dbo.instrument i"
@@ -192,7 +217,6 @@ class TPTFetcher():
 
         self.bloomberg_infos = self.bloomberg_infos[~self.bloomberg_infos.index.duplicated()]
         db_instruments_infos = pd.concat([db_instruments_infos, self.bloomberg_infos], axis=1)
-
         return db_instruments_infos
   
     def fetch_missing_infos(self, id_list):

@@ -1,3 +1,12 @@
 :root {
     --md-primary-fg-color:        #ff6b00;
   }
+
+.md-grid {
+  max-width: initial;
+}
+
+.center {
+  display: block;
+  margin: 0 auto;
+}

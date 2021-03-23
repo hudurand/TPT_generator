@@ -4,6 +4,7 @@ from .db_fetcher import TPTFetcher
 from .processor import DataProcessor
 from .scr_module import SCRModule
 from .constants import DB_INSTRUMENTS_INFOS_MAP, FIELDS, ALL
+import logging
 
 class DataBucket():
     """
@@ -18,29 +19,31 @@ class DataBucket():
     def __init__(self,
                  date,
                  client,
-                 shareclass_isin,
-                 source_dir):
+                 source_dir,
+                 shareclass_isin=None):
         # print("Initiliasing Data Bucket.")
         # Config inputs
         # print("Setting configuration.")
+        self.logger = logging.getLogger(__name__)
+        self.logger.info("Initialising bucket...")
+
         self.date = date
         self.client = client
-        self.shareclass_isin = shareclass_isin
         self.source_dir = source_dir
+        self.shareclass_isin = shareclass_isin
 
         # Initialise fetcher
-        self.fetcher = TPTFetcher(self.date,
-                                   self.client,
-                                   self.shareclass_isin,
-                                   source_dir)
+        self.fetcher = TPTFetcher(source_dir)
 
         # Database data placeholders
         self.shareclass_infos = None
         self.shareclass_nav = None
+        self.currency_rate = None
         self.subfund_infos = None
         self.fund_infos = None
         self.instruments = None
         self.instruments_infos = None
+        self.group_map = None
 
         # Processing results placeholders
         self.distribution_matrix = None
@@ -50,22 +53,64 @@ class DataBucket():
         # Data processing objects
         self.processor = DataProcessor(self)
         self.scr_module = SCRModule(self)
-    
+
+        self.logger.info("Bucket initialised")
+       
     def fetch(self):
         """
         Run all data-acquiring methods at once and each of them will in turn
         call their corresponding fetching methods to get data from database.
         """
-        self.get_shareclass_infos()
-        self.get_shareclass_nav()
-        self.get_subfund_infos()
-        self.get_fund_infos()
-        self.get_instruments()
-        self.get_instruments_infos()
+        #TODO replace by fetching functions
+
+        #self.get_shareclass_infos()
+        #self.get_shareclass_nav()
+        #self.get_subfund_infos()
+        #self.get_fund_infos()
+        #self.get_instruments()
+        #self.get_instruments_infos()
+
+    def update(self, isin):
+        # if bucket doesn't have any data:
+        #   set new isin as attribute and fetch data
+        # if bucket already have data of a subfund and new isin is in subfund
+        #   only need to change attribute (and recompute SCR)
+        # if bucket already have data but new isin is not in subfund
+        #   data must be reset, refetched and recomputed.
+
+        # BUT!!! in fact we only need to consider te case of a shareclass not in 
+        # the current subfund, since missing data is fetched dynamically.
+        
+        self.logger.info("Updating shareclass to generate report for")
+        self.shareclass_isin = isin
+        if self.shareclass_infos is not None:
+            # SCR requires to be reset at each new shareclass
+            self.scr = None
+
+            if self.shareclass_isin not in self.shareclass_infos.index:
+                # reset database data placeholders
+                self.shareclass_infos = None
+                self.shareclass_nav = None
+                self.subfund_infos = None
+                self.fund_infos = None
+                self.instruments = None
+                self.instruments_infos = None
+                self.group_map = None
+
+                # reset processing results placeholders
+                self.distribution_matrix = None
+                self.processing_data = None
+
+            else:
+                assert self.get_shareclass_infos().name == self.shareclass_isin
+                assert self.get_shareclass_nav().name == self.shareclass_isin
+                assert self.get_subfund_infos("id") == self.get_shareclass_infos("id_subfund")
+                # by this point, we can be sure that the data bucket is correctly set.
+
 
     def init_processing_data(self):
-        
-        isins = self.shareclass_infos.index
+        self.logger.info("Initialising processing data placeholder")
+        isins = self.get_shareclass_infos(isin=ALL).index
         index = pd.MultiIndex.from_product([self.get_instruments_by_index(idx=ALL).index,
                                             isins], names=["instrument", "shareclass"])
         self.processing_data = pd.DataFrame(index=index)
@@ -88,7 +133,10 @@ class DataBucket():
         self.processing_data = \
             self.processing_data.join(
                 self.get_instruments_by_index(idx=ALL,
-                                              info="market_and_accrued_fund"))
+                                              info="market_value_fund"))
+        self.processing_data = \
+            self.processing_data.join(
+                self.get_shareclass_nav(info="shareclass_total_net_asset_sc_curr", isin=ALL))
 
     def get_shareclass_infos(self, info=None, isin=None):
         """
@@ -99,7 +147,6 @@ class DataBucket():
             isin (str): isin code of the shareclass, if none the isin stored as\
                 attribute of the fetcher is used.
         """
-
         if self.shareclass_infos is None:
             self.shareclass_infos = self.fetcher.fetch_shareclass_infos(self.shareclass_isin)
             self.shareclass_infos.set_index("code_isin", inplace=True)
@@ -133,9 +180,12 @@ class DataBucket():
                                                         sc_curr,
                                                         sf_curr,
                                                         self.date)
-                
+                nav["rate"] = nav["shareclass_total_net_asset_sc_curr"] \
+                            / nav["shareclass_total_net_asset_sf_curr"]
                 nav.index = [i]
                 self.shareclass_nav = self.shareclass_nav.append(nav)
+            self.shareclass_nav.index.name = "shareclass"
+
         #print(self.shareclass_nav)
         if isin is None and info is None:
             return self.shareclass_nav.loc[self.shareclass_isin]
@@ -145,6 +195,32 @@ class DataBucket():
             return self.shareclass_nav.loc[isin]
         else:
             return self.shareclass_nav.loc[isin, info]
+
+    def get_groups(self, isin=None):
+        if self.group_map is None:
+            id_list = self.get_shareclass_infos("id", ALL).tolist()
+            self.group_map = self.fetcher.fetch_group_map(id_list)
+        
+        shareclass_id = self.get_shareclass_infos("id", isin)
+        return self.group_map.loc[self.group_map["shareclass_id"]==shareclass_id,
+                                                 "group_id"]
+    
+    def get_isins_in_group(self, id_group):
+        if self.group_map is None:
+            id_list = self.get_shareclass_infos("id", ALL).tolist()
+            self.group_map = self.fetcher.fetch_group_map(id_list)
+
+        shareclass_ids = self.group_map.loc[self.group_map["group_id"]==id_group,
+                                            "shareclass_id"]
+
+        return self.shareclass_infos.loc[self.shareclass_infos["id"].isin(shareclass_ids)].index
+
+    def get_subfund_shareclasses(self):
+        id_subfund = self.get_subfund_infos("id")
+
+        isins = self.fetcher.fetch_subfund_shareclasses(id_subfund)
+        
+        return isins
 
     def get_subfund_infos(self, info=None):
         if self.subfund_infos is None:
@@ -180,18 +256,13 @@ class DataBucket():
                                                               self.date)
             self.processor.process_instruments()
 
-        # fill missing value (for BIL)
-        # TODO: remove when bdd has been updated
-        self.instruments["hedge_indicator"].fillna(
-            self.get_subfund_infos("subfund_indicator"), inplace=True)
-
         return self.instruments.loc[idx, info]
         
-    def get_instruments_by_indicator(self,
-                                     info=None,
-                                     indicator=None):
-        indicators = self.get_instruments_by_index(idx=ALL, info="hedge_indicator")
-        index = indicators.loc[indicators.isin(indicator)].index
+    def get_instruments_by_group(self,
+                                 info=None,
+                                 group=None):
+        instrument_groups = self.get_instruments_by_index(idx=ALL, info="id_group")
+        index = instrument_groups.loc[instrument_groups.isin(group)].index
 
         return self.get_instruments_by_index(index, info)
 
@@ -216,10 +287,8 @@ class DataBucket():
         # shareclass (i.e: self.shareclass_isin)
         # the corresponding instruments are those associated to the shareclass 
         # itself, to any group the shareclass belongs to and to the whole subfund.
-        indicators = self.get_shareclass_infos(info=["shareclass",
-                                                     "shareclass_id"]).tolist()                                        
-        indicators.append(self.get_subfund_infos("subfund_indicator"))
-        return self.get_instruments_by_indicator(info, indicators)
+        groups = self.get_groups()                                        
+        return self.get_instruments_by_group(info, groups)
 
     def get_instruments_infos(self, idx=None, info=ALL):
         """
@@ -230,6 +299,7 @@ class DataBucket():
             instruments ([str, [str], None]): required instruments index
         """
         if self.instruments_infos is None:
+            self.logger.info("fetching instruments infos")
             instrument_id_list = self.get_instruments_by_index(idx=ALL).index
             db_instruments_infos = \
                 self.fetcher.fetch_db_instruments_infos(instrument_id_list)
@@ -242,30 +312,16 @@ class DataBucket():
             self.processor.clean_instruments_infos()
             self.processor.process_instruments_infos()
             self.instruments_infos.index.names = ["instrument"]
-        
+
         if idx is None:
             return self.instruments_infos.loc[self.get_instruments().index,
                                               info]
         else:
             return self.instruments_infos.loc[idx, info]
 
-    def get_isins_in_group(self, indicator):
-        id_subfund = self.get_subfund_infos("id")
-
-        isins = self.fetcher.fetch_isins_in_group(id_subfund=id_subfund,
-                                                  indicator=indicator)
-
-        return isins
-
-    def get_subfund_shareclasses(self):
-        id_subfund = self.get_subfund_infos("id")
-
-        isins = self.fetcher.fetch_subfund_shareclasses(id_subfund)
-        
-        return isins
-
     def get_distribution_vector(self):
         if self.processing_data is None:
+            self.logger.info("Computing processing data")
             self.processor.compute_processing_data()
 
         vec = self.processing_data.loc[(ALL, self.shareclass_isin), "distribution"]
@@ -283,7 +339,7 @@ class DataBucket():
 #
     def get_distribution_weight(self):
         return self.get_distribution_vector() \
-               / self.get_instruments("market_and_accrued_fund")
+               / self.get_instruments("market_value_fund")
 
     def get_processing_data(self, info):
         if self.processing_data is None:
@@ -313,32 +369,31 @@ class DataBucket():
         if self.fund_infos is None:
             fund_infos = None
         else:
-            fund_infos = f"{self.fund_infos.shape}"
+            fund_infos = f"{self.fund_infos.shape}\n"
             for idx in self.fund_infos.index.to_list():
                 fund_infos += f"""
-CODE:                                            {self.fund_infos.loc[idx, "fund_issuer_code"]}
 NAME:                                            {self.fund_infos.loc[idx, "fund_name"]}
 COUNTRY:                                         {self.fund_infos.loc[idx, "fund_country"]}
 ...
 """
+#CODE:                                            {self.fund_infos.loc[idx, "fund_issuer_code"]}
 
         if self.subfund_infos is None:
             subfund_infos = None
         else:
-            subfund_infos = f"{self.subfund_infos.shape}"
-            for idx in self.subfund_infos.index.to_list():
-                subfund_infos += f"""
-CODE:                                            {self.subfund_infos.loc[idx, "subfund_lei"]}
-NAME:                                            {self.subfund_infos.loc[idx, "subfund_name"]}
-CURRENCY:                                        {self.subfund_infos.loc[idx, "subfund_currency"]}
-ID:                                              {self.subfund_infos.loc[idx, "id"]}
+            subfund_infos = f"{self.subfund_infos.shape}\n"
+            subfund_infos += f"""
+CODE:                                            {self.subfund_infos.loc[0, "subfund_lei"]}
+NAME:                                            {self.subfund_infos.loc[0, "subfund_name"]}
+CURRENCY:                                        {self.subfund_infos.loc[0, "subfund_currency"]}
+ID:                                              {self.subfund_infos.loc[0, "id"]}
 ...
 """
 
         if self.shareclass_infos is None:
             shareclass_infos = None
         else:
-            shareclass_infos = f"{self.shareclass_infos.shape}"
+            shareclass_infos = f"{self.shareclass_infos.shape}\n"
             for idx in self.shareclass_infos.index.to_list():
                 shareclass_infos += f"""
 ISIN:                                            {self.shareclass_infos.loc[idx].name}
@@ -350,7 +405,7 @@ CURRENCY:                                        {self.shareclass_infos.loc[idx,
         if self.shareclass_nav is None:
             shareclass_nav = None
         else:
-            shareclass_nav = f"{self.shareclass_nav.shape}"
+            shareclass_nav = f"{self.shareclass_nav.shape}\n"
             for idx in self.shareclass_nav.index.to_list():
                 shareclass_nav += f"""
 {self.shareclass_infos.loc[idx].name}
@@ -365,14 +420,14 @@ TNA of subfund:                                  {self.shareclass_nav.loc[idx, "
             instruments = None
         else:
             instruments = f"""{self.instruments.shape}
-TNA of instruments values in subfund currency:   {self.instruments["market_and_accrued_fund"].sum()}
+TNA of instruments values in subfund currency:   {self.instruments["market_value_fund"].sum()}
 
 """
 
         if self.instruments_infos is None:
             instruments_infos = None
         else:
-            instruments_infos = f"{self.instruments_infos.shape}"
+            instruments_infos = f"{self.instruments_infos.shape}\n"
 
         return f"""
     fund infos:              {fund_infos}
@@ -382,3 +437,4 @@ TNA of instruments values in subfund currency:   {self.instruments["market_and_a
     instruments:             {instruments}
     instruments infos:       {instruments_infos}
         """
+ 

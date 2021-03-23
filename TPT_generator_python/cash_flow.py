@@ -109,7 +109,8 @@ class CashFlow():
                         / 100 * notional + notional
                     CF.loc[matdate, "down"] = (coupon / frequency) \
                         / 100 * notional + notional
-                
+            if '2019-07-03' in CF.index:
+                breakpoint()
             CF["rfr"] = CF["rfr"] * self.RFR.loc[CF.index, currency]
             CF["up"] = CF["up"] * self.UP.loc[CF.index, currency]
             CF["down"] = CF["down"] * self.DOWN.loc[CF.index, currency]

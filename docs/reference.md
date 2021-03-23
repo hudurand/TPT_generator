@@ -2,7 +2,20 @@
 
 ---
 
-::: TPT_generator_python.TPT_generator.TPT_Generator
+::: aor
+    handler: python
+    selection:
+        members:
+            - generate_from_config
+    rendering:
+        show_root_full_path: false
+        show_root_heading: true
+        show_source: true
+        group_by_category: false
+
+---
+
+::: TPT_generator_python.TPT_generator.TPTGenerator
     handler: python
     selection:
         members:
@@ -19,7 +32,7 @@
 
 ---
 
-::: TPT_generator_python.data_bucket.Data_Bucket
+::: TPT_generator_python.data_bucket.DataBucket
     selection:
         members:
             - fetch
@@ -32,7 +45,7 @@
     
 ---
 
-::: TPT_generator_python.db_fetcher.TPT_Fetcher
+::: TPT_generator_python.db_fetcher.TPTFetcher
     selection:
         members:
     rendering:
@@ -43,7 +56,7 @@
 
 ---
 
-::: TPT_generator_python.processor.Data_Processor
+::: TPT_generator_python.processor.DataProcessor
     selection:
         members:
     rendering:
@@ -54,7 +67,7 @@
 
 ---
 
-::: TPT_generator_python.scr_module.SCR_Module
+::: TPT_generator_python.scr_module.SCRModule
     selection:
         members:
     rendering:
