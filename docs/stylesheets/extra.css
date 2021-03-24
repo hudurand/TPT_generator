@@ -10,3 +10,13 @@
   display: block;
   margin: 0 auto;
 }
+
+.doc-heading{
+  --md-code-fg-color: #ff8f3e !important;
+  --md-code-hl-name-color: #ff6b00;
+  
+}
+
+.doc-heading .kc{
+  color: #6e59d9;
+}

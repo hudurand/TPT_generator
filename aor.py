@@ -32,7 +32,7 @@ from TPT_generator_python import TPTGenerator
 
 def generate_from_config(config_file, debug=False):
     """
-    Generate TPT report(s) using input arguments specified in a config file.
+    Generates TPT report(s) using input arguments specified in a config file.
 
     Args:
         config_file (path): configuration file

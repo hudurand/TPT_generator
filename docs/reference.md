@@ -22,8 +22,6 @@
             - generate
             - create_empty_report
             - output_excel
-            - check_required
-            - fill_instrument_info
     rendering:
         show_root_full_path: false
         show_root_heading: true

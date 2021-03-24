@@ -21,7 +21,6 @@ As the goal is to create a framework for building reporting tools, it was built 
     - [Implementation](implementation.md)
         - [Modelisation](implementation/#modelisation)
         - [Generation steps](implementation/#generation-steps)
-        - [Reference](reference/#TPT_generator_python.TPT_generator.TPTGenerator)
 - [Reference](reference.md)
 
 ## Commands

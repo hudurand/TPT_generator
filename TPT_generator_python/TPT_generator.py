@@ -37,7 +37,7 @@ class TPTGenerator():
                  sym_adj=0,
                  shareclass_isin=None):
         """
-        Initialise report-specific attributes helper objects.
+        Initialises report-specific attributes helper objects.
         """
         # Initialise logger object
         self.logger = logging.getLogger(__name__)
@@ -72,7 +72,7 @@ class TPTGenerator():
 
     def __repr__(self):
         """
-        overload __repr__ function for logging and easier debugging.
+        overloads __repr__ function for logging and easier debugging.
         """
         if self.report:
             n = self.report.shape[0]
@@ -88,7 +88,7 @@ class TPTGenerator():
 
     def generate(self, shareclass_isin=None):
         """
-        Generate the report by calling the filling methods for all columns.
+        Generates the report by calling the filling methods for all columns.
         """
         
         assert (self.data_bucket.shareclass_isin
@@ -133,6 +133,9 @@ class TPTGenerator():
             self.output_excel()
 
     def fill_report(self):
+        """
+        Fills-in all data into the 
+        """
 
         self.logger.info("Filling report")
 
@@ -145,7 +148,7 @@ class TPTGenerator():
 
     def create_empty_report(self):
         """
-        Create an empty pandas dataframe to hold the TPT report to generate.
+        Creates an empty pandas dataframe to hold the TPT report to generate.
         """
         self.report = pd.DataFrame(index=self.data_bucket.get_instruments().index, columns=self.fields.values(), dtype=object)
     
@@ -160,12 +163,15 @@ class TPTGenerator():
         client = self.data_bucket.client
         isin = self.data_bucket.shareclass_isin
         date = self.data_bucket.date
+
+        # open template excel
         template_file_name = 'AO_TPT_V5.0_Template.xlsx'
         output_file_name = f"AO_TPT_V5.0_{client}_{isin}_{date}.xlsx"
         template = openpyxl.load_workbook(self.source_dir / template_file_name)
         report = template.get_sheet_by_name('Report')
         rows = dataframe_to_rows(self.report, index=False)
 
+        # map dataframe columns to excel columns 
         column_map = {}
         for row_idx, row in enumerate(rows):
             if row_idx == 0:
@@ -187,20 +193,21 @@ class TPTGenerator():
                         report.cell(row=row_idx+1, column=column_map[col_idx], value=value)
                         report.cell(row=row_idx+1, column=column_map[col_idx]).alignment = Alignment(horizontal='center')
 
+        # save produced report
         template.save(self.output_dir / output_file_name)
 
-    def check_required(self, required_fields):
-        """
-        Check if the fields given as input are filled and fill them if necessary.
-        """
-        for field in required_fields:
-            if self.report[self.fields[field]].isnull().values.all():
-                #print(f"fill_column_{field}")
-                getattr(self, f"fill_column_{field}")()
+#    def check_required(self, required_fields):
+#        """
+#        Check if the fields given as input are filled and fill them if necessary.
+#        """
+#        for field in required_fields:
+#            if self.report[self.fields[field]].isnull().values.all():
+#                #print(f"fill_column_{field}")
+#                getattr(self, f"fill_column_{field}")()
 
     def fill_instrument_info(self, info):
         """
-        Abstracting class to fill fixed instruments speficific informations.
+        Abstracting method to fill fixed instruments speficific informations.
         """
 
         self.report[info].update(self.data_bucket.get_instruments_infos(info=info))
@@ -208,67 +215,97 @@ class TPTGenerator():
     
     def fill_scr(self, submodule):
         """
-        Abstracting class to fill fixed SCR computed values.
+        Abstracting method to fill SCR computed values.
         """
 
         self.report[submodule].update(self.data_bucket.get_scr_results(submodule))
 
     def fill_column_1(self):
         """
-        Fill column "1_Portfolio identifying data".
+        Fills column "1_Portfolio identifying data".
         
-        Code isin of the shareclass, provided by config.
+        isin code of the shareclass, provided by config.
         """
         self.report.loc[:,self.fields["1"]] = self.data_bucket.shareclass_isin
     
     def fill_column_2(self):
         """
-        Fill column "2_Type of identification code for the fund share or portfolio".
+        Fills column "2_Type of identification code for the fund share or portfolio".
 
-        Codification chosen to identify the shareclass.
+        Codification chosen to identify the shareclass, reported from database.
         """
         self.report.loc[:,self.fields["2"]] = \
             int(self.data_bucket.get_shareclass_infos("type_tpt"))
 
     def fill_column_3(self):
         """
-        Fill column "3_Portfolio_name".
+        Fills column "3_Portfolio_name".
 
-        Name of the shareclass, obtained from database.
+        Name of the shareclass, reported from database.
         """
         self.report.loc[:,self.fields["3"]] = \
             self.data_bucket.get_shareclass_infos("shareclass_name")
     
     def fill_column_4(self):
         """
-        Fill column "4_Portfolio_currency_(B)".
+        Fills column "4_Portfolio_currency_(B)".
 
-        Valuation currency of the portfolio.
+        Valuation currency of the portfolio, reported from database.
         """
         self.report.loc[:,self.fields["4"]] = \
             self.data_bucket.get_shareclass_infos("shareclass_currency")
 
     def fill_column_5(self):
+        """
+        Fills column "5_Net asset valuation of the portfolio or the share class in portfolio currency".
+
+        NAV of the shareclass, reported from database.
+        """
         self.report.loc[:,self.fields["5"]] = \
             self.data_bucket.get_shareclass_nav(info="shareclass_total_net_asset_sc_curr")
 
     def fill_column_6(self):
+        """
+        Fills column "6_Valuation date".
+
+        Date of valuation, reported from database.
+        """
         self.report.loc[:,self.fields["6"]] = \
             self.data_bucket.get_shareclass_nav("nav_date")
 
     def fill_column_7(self):
+        """
+        Fills column "7_Reporting date".
+
+        Date of reporting, provided by config.
+        """
         self.report.loc[:,self.fields["7"]] = \
             self.data_bucket.date.strftime('%Y-%m-%d')
 
     def fill_column_8(self):
+        """
+        Fills column "8_Share price".
+
+        Price of one share of the shareclass, reported from database.
+        """
         self.report.loc[:,self.fields["8"]] = \
             self.data_bucket.get_shareclass_nav("share_price")
 
     def fill_column_8b(self):
+        """
+        Fills column "8b_Total number of shares".
+
+        Number of share emmited for the shareclass, reported from database.
+        """
         self.report.loc[:,self.fields["8b"]] = \
             self.data_bucket.get_shareclass_nav("outstanding_shares")
 
     def fill_column_9(self):
+        """
+        Fills column "9_% cash".
+
+        Percentage of cash in the shareclass TNA, computed from portfolio.
+        """
         # sum of "XT72" CIC code of the instrument divided by shareclass MV
         # TODO: replace by running bucket at init
         _ = self.data_bucket.get_processing_data("distribution")
@@ -276,6 +313,13 @@ class TPTGenerator():
             / self.data_bucket.get_shareclass_nav(info="shareclass_total_net_asset_sc_curr")
     
     def fill_column_10(self):
+        """
+        Fills column "10_Portfolio Modified Duration"
+
+        Weighted average modified duration of portfolio positions, computed from processed data.
+        
+        require: Market exposure, shareclass TNA, Modified duration to next option exercise date.
+        """
         product = self.data_bucket.get_processing_data("ME") \
                   / self.data_bucket.get_shareclass_nav(info="shareclass_total_net_asset_sf_curr") \
                   * self.data_bucket.get_instruments_infos(info=self.fields["91"])
@@ -288,9 +332,19 @@ class TPTGenerator():
         self.report[self.fields["10"]] = val
         
     def fill_column_11(self):
+        """
+        Fills column "11_Complete_SCR_delivery"
+
+        Y/N, Y: SCR has been computed (col. 97-105), provided by config.
+        """
         self.report[self.fields["11"]] = "Y"
 
     def fill_column_12(self):
+        """
+        Fills column "12_CIC_code_of_the_instrument"
+
+        CIC Code (Complementary Identification Code), reported from database.
+        """
         self.fill_instrument_info(self.fields["12"])
 
     def fill_column_13(self):
