@@ -307,7 +307,6 @@ class DataBucket():
             sp_instruments_infos = self.processor.set_sp_instrument_infos()
 
             self.instruments_infos = sp_instruments_infos.append(db_instruments_infos)
-            
             # clean and process data
             self.processor.clean_instruments_infos()
             self.processor.process_instruments_infos()

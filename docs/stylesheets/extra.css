@@ -20,3 +20,10 @@
 .doc-heading .kc{
   color: #6e59d9;
 }
+
+/* Indentation. */
+div.doc-contents:not(.first) {
+  padding-left: 25px;
+  border-left: 4px solid rgba(230, 230, 230);
+  margin-bottom: 80px;
+}

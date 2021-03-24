@@ -569,39 +569,32 @@ def test_fill_column_25(generator, reference_report):
 
     generator.fill_column_25()
     
-    prod = generator.report.sort_index()
-    ref = reference_report.sort_index()
+    prod = pd.to_numeric(generator.report["25_Clean market valuation in portfolio currency (B)"].sort_index()).round(5)
+    ref = pd.to_numeric(reference_report["25_Clean market valuation in portfolio currency (B)"].sort_index()).round(5)
     
-    column = pd.to_numeric(prod["25_Clean market valuation in portfolio currency (B)"]).round(5)
-    ref_col = pd.to_numeric(ref["25_Clean market valuation in portfolio currency (B)"]).round(5)
-
-    diff1 = column.loc[column != ref_col]
+    diff1 = prod.loc[prod != ref]
     print(diff1)
-    diff2 = ref_col.loc[ref_col != column]
+    diff2 = ref.loc[ref != prod]
     print(diff2)
 
-    assert_series_equal(column, ref_col,
+    assert_series_equal(prod, ref,
                         check_dtype=False,)
 
 def test_fill_column_26(generator, reference_report):
 
     generator.fill_column_26()
-    
-    prod = generator.report.sort_index()
-    ref = reference_report.sort_index()
-    
-    column = pd.to_numeric(prod["26_Valuation weight"]).round(5)
-    ref_col = pd.to_numeric(ref["26_Valuation weight"]).round(5)
 
-    diff1 = column.loc[column != ref_col]
+    prod = pd.to_numeric(generator.report["26_Valuation weight"].sort_index()).round(5)
+    ref = pd.to_numeric(reference_report["26_Valuation weight"].sort_index()).round(5)
+    
+    diff1 = prod.loc[prod != ref]
     print(diff1)
-    diff2 = ref_col.loc[ref_col != column]
+    diff2 = ref.loc[ref != prod]
     print(diff2)
 
-    assert_series_equal(column, ref_col, 
-                        check_dtype=False,
-                        check_less_precise=5)
-
+    assert_series_equal(prod, ref,
+                        check_dtype=False,)
+    
 def test_fill_column_27(generator, reference_report):
 
     generator.fill_column_27()
@@ -991,16 +984,16 @@ def test_fill_column_58b(generator, reference_report):
 def test_fill_column_59(generator, reference_report):
     generator.fill_column_59()
     
-    prod = generator.report.sort_index()
-    ref = reference_report.sort_index()
+    prod = generator.report["59_Credit quality step"].sort_index()
+    ref = reference_report["59_Credit quality step"].sort_index()
 
-    diff1 = prod.loc[prod["59_Credit quality step"] != ref["59_Credit quality step"]]
-    print(diff1.loc[:, ["54_Economic sector", "59_Credit quality step"]]) #"12_CIC code of the instrument", 
-    diff2 = ref.loc[ref["59_Credit quality step"] != prod["59_Credit quality step"]]
-    print(diff2.loc[:, ["54_Economic sector", "59_Credit quality step"]]) #"12_CIC code of the instrument", 
+    
+    diff1 = prod.loc[prod != ref]
+    print(diff1) #"12_CIC code of the instrument", 
+    diff2 = ref.loc[ref != prod]
+    print(diff2) #"12_CIC code of the instrument", 
 
-    column = prod["59_Credit quality step"]
-    assert_series_equal(column, ref["59_Credit quality step"], check_dtype=False)
+    assert_series_equal(prod, ref, check_dtype=False)
 
 def test_fill_column_60(generator, reference_report):
 

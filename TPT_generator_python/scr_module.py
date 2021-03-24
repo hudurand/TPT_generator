@@ -183,6 +183,9 @@ class SCRModule():
         elif row[FIELDS["12"]][2] in ["2", "8"]:
             duration = row[FIELDS["90"]]
             CQS = row[FIELDS["59"]]
+            
+            #if pd.isnull(duration) or pd.isnull(CQS):
+            #    breakpoint()
             shock = self.spread_risk_parameter(1, duration, CQS)
         else:
             return 0 

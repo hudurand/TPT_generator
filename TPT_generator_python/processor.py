@@ -83,7 +83,7 @@ class DataProcessor():
     def process_instruments_infos(self):
         self.logger.info("processing instruments infos")
 
-        if self.data_bucket.instruments_infos[FIELDS["59"]].isnull().values.all():
+        if self.data_bucket.instruments_infos[FIELDS["59"]].isnull().values.any():
             self.compute_59()
         if FIELDS["137"] not in self.data_bucket.instruments_infos.columns:
             self.compute_137()

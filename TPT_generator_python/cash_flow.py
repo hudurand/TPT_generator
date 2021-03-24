@@ -16,6 +16,7 @@ class CashFlow():
                          "33_Coupon rate",
                          "38_Coupon payment frequency",
                          "39_Maturity date",
+                         "40_Redemption type",
                          "43_Call / put date",
                          "45_Strike price for embedded (call/put) options"])
 
@@ -37,15 +38,19 @@ class CashFlow():
         repdate = instrument["7_Reporting date"]
         optdate = instrument["43_Call / put date"]
         matdate = instrument["39_Maturity date"]
+        redempt_type = instrument["40_Redemption type"]
 
-        if cic[2] in ["1", "2", "5"]:
+        
+        if cic[2] in ["1", "2", "5"] and redempt_type != "Defaulted":
             if pd.isnull(matdate):
                 if pd.isnull(optdate):
                     optdate = repdate + pd.offsets.DateOffset(years=40)
                 matdate = pd.to_datetime(optdate)
 
             if frequency == 0:
-                if pd.isnull(optdate):
+                if pd.isnull(optdate) or optdate < repdate:
+                    if optdate < repdate:
+                        print(["[WARNING] optdate < repdate"])
                     dates = [matdate]
                 else:
                     dates = [optdate]
@@ -109,7 +114,7 @@ class CashFlow():
                         / 100 * notional + notional
                     CF.loc[matdate, "down"] = (coupon / frequency) \
                         / 100 * notional + notional
-            if '2019-07-03' in CF.index:
+            if '2020-11-21' in CF.index:
                 breakpoint()
             CF["rfr"] = CF["rfr"] * self.RFR.loc[CF.index, currency]
             CF["up"] = CF["up"] * self.UP.loc[CF.index, currency]

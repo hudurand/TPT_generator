@@ -224,15 +224,17 @@ class TPTGenerator():
         """
         Fills column "1_Portfolio identifying data".
         
-        isin code of the shareclass, provided by config.
+        **Definition:** isin code of the shareclass  
+        **methodology:** provided by config
         """
         self.report.loc[:,self.fields["1"]] = self.data_bucket.shareclass_isin
     
     def fill_column_2(self):
         """
         Fills column "2_Type of identification code for the fund share or portfolio".
-
-        Codification chosen to identify the shareclass, reported from database.
+        
+        **Definition:** codification chosen to identify the shareclass  
+        **methodology:** reported from database
         """
         self.report.loc[:,self.fields["2"]] = \
             int(self.data_bucket.get_shareclass_infos("type_tpt"))
@@ -240,8 +242,9 @@ class TPTGenerator():
     def fill_column_3(self):
         """
         Fills column "3_Portfolio_name".
-
-        Name of the shareclass, reported from database.
+        
+        **Definition:** definition: name of the shareclass  
+        **methodology:** reported from database
         """
         self.report.loc[:,self.fields["3"]] = \
             self.data_bucket.get_shareclass_infos("shareclass_name")
@@ -249,8 +252,9 @@ class TPTGenerator():
     def fill_column_4(self):
         """
         Fills column "4_Portfolio_currency_(B)".
-
-        Valuation currency of the portfolio, reported from database.
+        
+        **Definition:** valuation currency of the portfolio  
+        **methodology:** reported from database
         """
         self.report.loc[:,self.fields["4"]] = \
             self.data_bucket.get_shareclass_infos("shareclass_currency")
@@ -258,8 +262,9 @@ class TPTGenerator():
     def fill_column_5(self):
         """
         Fills column "5_Net asset valuation of the portfolio or the share class in portfolio currency".
-
-        NAV of the shareclass, reported from database.
+        
+        **Definition:** NAV of the shareclass  
+        **methodology:** reported from database
         """
         self.report.loc[:,self.fields["5"]] = \
             self.data_bucket.get_shareclass_nav(info="shareclass_total_net_asset_sc_curr")
@@ -267,8 +272,9 @@ class TPTGenerator():
     def fill_column_6(self):
         """
         Fills column "6_Valuation date".
-
-        Date of valuation, reported from database.
+        
+        **Definition:** date of valuation  
+        **methodology:** reported from database
         """
         self.report.loc[:,self.fields["6"]] = \
             self.data_bucket.get_shareclass_nav("nav_date")
@@ -276,8 +282,9 @@ class TPTGenerator():
     def fill_column_7(self):
         """
         Fills column "7_Reporting date".
-
-        Date of reporting, provided by config.
+        
+        **Definition:** date of reporting  
+        **methodology:** provided by config
         """
         self.report.loc[:,self.fields["7"]] = \
             self.data_bucket.date.strftime('%Y-%m-%d')
@@ -285,8 +292,9 @@ class TPTGenerator():
     def fill_column_8(self):
         """
         Fills column "8_Share price".
-
-        Price of one share of the shareclass, reported from database.
+        
+        **Definition:** price of one share of the shareclass  
+        **methodology:** reported from database
         """
         self.report.loc[:,self.fields["8"]] = \
             self.data_bucket.get_shareclass_nav("share_price")
@@ -294,8 +302,9 @@ class TPTGenerator():
     def fill_column_8b(self):
         """
         Fills column "8b_Total number of shares".
-
-        Number of share emmited for the shareclass, reported from database.
+        
+        **Definition:** number of share emmited for the shareclass  
+        **methodology:** reported from database
         """
         self.report.loc[:,self.fields["8b"]] = \
             self.data_bucket.get_shareclass_nav("outstanding_shares")
@@ -303,8 +312,9 @@ class TPTGenerator():
     def fill_column_9(self):
         """
         Fills column "9_% cash".
-
-        Percentage of cash in the shareclass TNA, computed from portfolio.
+        
+        **Definition:** percentage of cash in the shareclass TNA  
+        **methodology:** computed from portfolio
         """
         # sum of "XT72" CIC code of the instrument divided by shareclass MV
         # TODO: replace by running bucket at init
@@ -315,10 +325,13 @@ class TPTGenerator():
     def fill_column_10(self):
         """
         Fills column "10_Portfolio Modified Duration"
-
-        Weighted average modified duration of portfolio positions, computed from processed data.
         
-        require: Market exposure, shareclass TNA, Modified duration to next option exercise date.
+        **Definition:** weighted average modified duration of portfolio positions  
+        **methodology:** computed from processed data  
+        **require:**  
+            [market exposure](processor#compute_ME)  
+            [shareclass TNA](data_bucket#getshareclassnav)  
+            [modified duration to next option exercise date]() 
         """
         product = self.data_bucket.get_processing_data("ME") \
                   / self.data_bucket.get_shareclass_nav(info="shareclass_total_net_asset_sf_curr") \
@@ -334,16 +347,18 @@ class TPTGenerator():
     def fill_column_11(self):
         """
         Fills column "11_Complete_SCR_delivery"
-
-        Y/N, Y: SCR has been computed (col. 97-105), provided by config.
+        
+        **Definition:** Y/N, Y: SCR has been computed (col. 97-105)  
+        **methodology:** provided by config
         """
         self.report[self.fields["11"]] = "Y"
 
     def fill_column_12(self):
         """
         Fills column "12_CIC_code_of_the_instrument"
-
-        CIC Code (Complementary Identification Code), reported from database.
+        
+        **Definition:** CIC Code (Complementary Identification Code)
+        **methodology:** reported from database
         """
         self.fill_instrument_info(self.fields["12"])
 
@@ -514,11 +529,9 @@ class TPTGenerator():
         self.fill_instrument_info(self.fields["47"])
 
     def fill_column_48(self):
-        self.check_required(["47"])
-
-        self.report[self.fields["48"]] = 9
+        self.report[self.fields["48"]] = 9 
         self.report[self.fields["48"]].where(
-            self.report[self.fields["47"]].isnull(),
+            self.data_bucket.get_instruments_infos(info=self.fields["47"]).isnull(),
             1,
             inplace=True)
 
@@ -529,11 +542,9 @@ class TPTGenerator():
         self.fill_instrument_info(self.fields["50"])
 
     def fill_column_51(self):
-        self.check_required(["50"])
-
         self.report[self.fields["51"]] = 9
         self.report[self.fields["51"]].where(
-            self.report[self.fields["50"]].isnull(),
+            self.data_bucket.get_instruments_infos(info=self.fields["50"]).isnull(),
             1,
             inplace=True)
 
@@ -734,25 +745,17 @@ class TPTGenerator():
         pass
 
     def fill_column_114(self):
-        self.check_required(["13"])
-
         self.report[self.fields["114"]] = \
-            self.report[self.fields["13"]].where(
-                self.report[self.fields["13"]] != 0)
+            self.data_bucket.get_instruments_infos(info=self.fields["13"]).where(
+                self.data_bucket.get_instruments_infos(info=self.fields["13"]) != 0)
 
     def fill_column_115(self):
-        self.report.loc[:,self.fields["115"]] = \
+        self.report[self.fields["115"]] = \
             self.data_bucket.get_subfund_infos("subfund_lei")
 
     def fill_column_116(self):
-        
-        self.check_required(["115"])
-
-        self.report[self.fields["116"]] = 9
-        self.report[self.fields["116"]].where(
-            self.report[self.fields["115"]].isnull(),
-            1,
-            inplace=True)
+        self.report[self.fields["116"]] = \
+            9 if not self.data_bucket.get_subfund_infos("subfund_lei") else 1
 
     def fill_column_117(self):
         self.report.loc[:,self.fields["117"]] = \
@@ -767,14 +770,9 @@ class TPTGenerator():
             self.data_bucket.get_fund_infos("fund_issuer_group_code")
 
     def fill_column_120(self):
-        
-        self.check_required(["119"])
+        self.report[self.fields["120"]] = \
+            9 if not self.data_bucket.get_fund_infos("fund_issuer_group_code") else 1
 
-        self.report[self.fields["120"]] = 9
-        self.report[self.fields["120"]].where(
-            self.report[self.fields["119"]].isnull(),
-            1,
-            inplace=True)
     def fill_column_121(self):
         self.report.loc[:,self.fields["121"]] = \
             self.data_bucket.get_fund_infos("fund_name")
@@ -793,7 +791,7 @@ class TPTGenerator():
     #        self.data_bucket.get_fund_infos("depositary_country")
 
     def fill_column_124(self):
-        self.check_required(["10"])
+        self.fill_column_10()
 
         self.report[self.fields["124"]] = self.report[self.fields["10"]]
 

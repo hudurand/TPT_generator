@@ -5,6 +5,7 @@ nav:
     - TPT Solvency II:
         - Methodology: methodology.md
         - Implementation: implementation.md
+        - Debugging: debugging.md
     - Reference: 
         - Base: reference.md
         - TPT Solvency II: reference_tpt.md
@@ -16,7 +17,7 @@ theme:
 plugins:
     - search
     - mkdocstrings:
-        custom_templates: docs/templates
+        custom_templates: docs\templates
 extra_css:
     - stylesheets/extra.css
 markdown_extensions:
