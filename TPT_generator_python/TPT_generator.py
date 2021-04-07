@@ -159,13 +159,14 @@ class TPTGenerator():
         self.logger.info("writing excel")
         self.logger.debug(self)
 
-        client = self.data_bucket.client
+        #client = self.data_bucket.client
         isin = self.data_bucket.shareclass_isin
         date = self.data_bucket.date
+        sc_name = self.data_bucket.get_shareclass_infos("shareclass_name")
 
         # open template excel
         template_file_name = 'AO_TPT_V5.0_Template.xlsx'
-        output_file_name = f"AO_TPT_V5.0_{client}_{isin}_{date}.xlsx"
+        output_file_name = f"AO_TPT_V5.0_{sc_name}_{isin}_{date}.xlsx"
         template = openpyxl.load_workbook(self.source_dir / template_file_name)
         report = template.get_sheet_by_name('Report')
         rows = dataframe_to_rows(self.report, index=False)
@@ -197,74 +198,51 @@ class TPTGenerator():
         scr_sheet.cell(row=2, column=2, value=self.data_bucket.get_shareclass_infos("shareclass_name"))
         
         # shareclass' infos
-        scr_sheet.cell(row=6, column=3, value="date")
-        scr_sheet.cell(row=7, column=3, value="fund name")
-        scr_sheet.cell(row=8, column=3, value="isin")
-        scr_sheet.cell(row=9, column=3, value="CCY")
-        scr_sheet.cell(row=10, column=3, value="NAV")
+        scr_sheet.cell(row=6, column=3, value=self.data_bucket.date)
+        scr_sheet.cell(row=7, column=3, value=self.data_bucket.get_shareclass_infos("shareclass_name"))
+        scr_sheet.cell(row=8, column=3, value=self.data_bucket.get_shareclass_infos().name)
+        scr_sheet.cell(row=9, column=3, value=self.data_bucket.get_shareclass_infos("shareclass_currency"))
+        scr_sheet.cell(row=10, column=3, value=self.data_bucket.get_shareclass_nav("shareclass_total_net_asset_sc_ccy"))
 
         # sub-module detail
-        scr_sheet.cell(row=16, column=3, value="capreq")
-        scr_sheet.cell(row=16, column=4, value="%")
-        scr_sheet.cell(row=17, column=3, value="capreq")
-        scr_sheet.cell(row=17, column=4, value="%")
-        scr_sheet.cell(row=18, column=3, value="capreq")
-        scr_sheet.cell(row=18, column=4, value="%")
-        scr_sheet.cell(row=19, column=3, value="capreq")
-        scr_sheet.cell(row=19, column=4, value="%")
-        scr_sheet.cell(row=20, column=3, value="capreq")
-        scr_sheet.cell(row=20, column=4, value="%")
+        submodules = ["interest_rate_risk", 
+                      "equity_risk",
+                      "property_risk",
+                      "spread_risk",
+                      "currency_risk"]
+
+        for i, submodule in enumerate(submodules):
+            weight_capreq = getattr(self.data_bucket.scr_module, f"compute_{submodule}_submodule")()
+            scr_sheet.cell(row=16 + i, column=3, value=weight_capreq * self.data_bucket.get_shareclass_nav("shareclass_total_net_asset_sc_ccy"))
+            scr_sheet.cell(row=16 + i, column=3).number_format = '#,##0.00'
+            scr_sheet.cell(row=16 + i, column=4, value=weight_capreq)
+            scr_sheet.cell(row=16 + i, column=4).number_format = '#,##0.000 %'
         
+        categories = ["Interest_rate_risk_Up",
+                      "Interest_rate_risk_Down",
+                      "Equity_Risk_Type_1",
+                      "Equity_Risk_Type_2",
+                      "Property",
+                      "Spread_risk_of_bonds",
+                      "Credit_risk_Structured_Products",
+                      "Credit_risk_Derivatives_Up",
+                      "Credit_risk_Derivatives_Down",
+                      "Currency_risk_Up",
+                      "Currency_risk_Down"]
+
         # risks specific detail
-        scr_sheet.cell(row=23, column=3, value="capreq")
-        scr_sheet.cell(row=23, column=3, value="%")
-        scr_sheet.cell(row=24, column=3, value="capreq")
-        scr_sheet.cell(row=24, column=3, value="%")
-        scr_sheet.cell(row=25, column=3, value="capreq")
-        scr_sheet.cell(row=25, column=3, value="%")
-        scr_sheet.cell(row=26, column=3, value="capreq")
-        scr_sheet.cell(row=26, column=3, value="%")
-        scr_sheet.cell(row=27, column=3, value="capreq")
-        scr_sheet.cell(row=27, column=3, value="%")
-        scr_sheet.cell(row=28, column=3, value="capreq")
-        scr_sheet.cell(row=28, column=3, value="%")
-        scr_sheet.cell(row=29, column=3, value="capreq")
-        scr_sheet.cell(row=29, column=3, value="%")
-        scr_sheet.cell(row=30, column=3, value="capreq")
-        scr_sheet.cell(row=30, column=3, value="%")
-        scr_sheet.cell(row=31, column=3, value="capreq")
-        scr_sheet.cell(row=31, column=3, value="%")
-        scr_sheet.cell(row=32, column=3, value="capreq")
-        scr_sheet.cell(row=32, column=3, value="%")
-        scr_sheet.cell(row=33, column=3, value="capreq")
-        scr_sheet.cell(row=33, column=3, value="%")
-        scr_sheet.cell(row=34, column=3, value="capreq")
-        scr_sheet.cell(row=34, column=3, value="%")
+        for i, category in enumerate(categories):
+            weight_capreq = getattr(self.data_bucket.scr_module, category)
+            print(category)
+            print(weight_capreq)
+            scr_sheet.cell(row=23 + i, column=3, value=weight_capreq * self.data_bucket.get_shareclass_nav("shareclass_total_net_asset_sc_ccy"))
+            scr_sheet.cell(row=23 + i, column=3).number_format = '#,##0.00'
+            scr_sheet.cell(row=23 + i, column=4, value=weight_capreq)
+            scr_sheet.cell(row=23 + i, column=4).number_format = '#,##0.000 %'
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        # total SCR market risk
+        scr_sheet.cell(row=13, column=3, value= self.data_bucket.scr_module.compute_total_scr_market_risk())
+        scr_sheet.cell(row=13, column=3).number_format = '#,##0.000 %'
         # save produced report
         template.save(self.output_dir / output_file_name)
 
@@ -339,7 +317,7 @@ class TPTGenerator():
         **methodology:** reported from database
         """
         self.report.loc[:,self.fields["5"]] = \
-            self.data_bucket.get_shareclass_nav(info="shareclass_total_net_asset_sc_curr")
+            self.data_bucket.get_shareclass_nav(info="shareclass_total_net_asset_sc_ccy")
 
     def fill_column_6(self):
         """
@@ -392,7 +370,7 @@ class TPTGenerator():
         # TODO: replace by running bucket at init
         _ = self.data_bucket.get_processing_data("distribution")
         self.report[self.fields["9"]] = self.data_bucket.get_shareclass_infos(info="cash") \
-            / self.data_bucket.get_shareclass_nav(info="shareclass_total_net_asset_sc_curr")
+            / self.data_bucket.get_shareclass_nav(info="shareclass_total_net_asset_sc_ccy")
     
     def fill_column_10(self):
         """
@@ -406,7 +384,7 @@ class TPTGenerator():
             [modified duration to next option exercise date]() 
         """
         product = self.data_bucket.get_processing_data("ME") \
-                  / self.data_bucket.get_shareclass_nav(info="shareclass_total_net_asset_sf_curr") \
+                  / self.data_bucket.get_shareclass_nav(info="shareclass_total_net_asset_sf_ccy") \
                   * self.data_bucket.get_instruments_infos(info=self.fields["91"])
         
         if product.isnull().values.all():
@@ -506,7 +484,7 @@ class TPTGenerator():
 
     def fill_column_24(self):
         column_24 = self.data_bucket.get_processing_data("valuation weight") \
-                    * self.data_bucket.get_shareclass_nav("shareclass_total_net_asset_sc_curr")
+                    * self.data_bucket.get_shareclass_nav("shareclass_total_net_asset_sc_ccy")
 
         self.report[self.fields["24"]].update(column_24)
 
@@ -532,8 +510,8 @@ class TPTGenerator():
 
     def fill_column_28(self):
         self.report[self.fields["28"]] = self.data_bucket.get_processing_data("ME") \
-                                             * self.data_bucket.get_shareclass_nav(info="shareclass_total_net_asset_sc_curr") \
-                                             / self.data_bucket.get_shareclass_nav(info="shareclass_total_net_asset_sf_curr")
+                                             * self.data_bucket.get_shareclass_nav(info="shareclass_total_net_asset_sc_ccy") \
+                                             / self.data_bucket.get_shareclass_nav(info="shareclass_total_net_asset_sf_ccy")
 
 
     def fill_column_29(self):
@@ -541,7 +519,7 @@ class TPTGenerator():
 
     def fill_column_30(self):
         self.report[self.fields["30"]] = self.data_bucket.get_processing_data("ME") \
-                                             / self.data_bucket.get_shareclass_nav(info="shareclass_total_net_asset_sf_curr")
+                                             / self.data_bucket.get_shareclass_nav(info="shareclass_total_net_asset_sf_ccy")
 
     def fill_column_31(self):
         pass
@@ -878,7 +856,7 @@ class TPTGenerator():
     def fill_column_126(self):
         column_126 = self.data_bucket.get_instruments("accrued_fund") \
                      * self.data_bucket.get_processing_data("valuation weight") \
-                    * self.data_bucket.get_shareclass_nav("shareclass_total_net_asset_sc_curr") \
+                    * self.data_bucket.get_shareclass_nav("shareclass_total_net_asset_sc_ccy") \
                      / self.data_bucket.get_instruments("market_value_fund") 
 
         self.report[self.fields["126"]].update(column_126)

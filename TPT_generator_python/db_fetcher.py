@@ -109,6 +109,8 @@ class TPTFetcher():
                                       +'ON f.id_depositary=d.id '
                                       +f"WHERE f.id='{fund_id}'", 
                                        self.connector)
+        if len(fund_infos['fund_country']) == 0:
+            breakpoint()
         fund_infos.rename(columns={"depositary_lei":"fund_issuer_code"}, inplace=True)
         fund_infos["issuer_economic_area"] = pd.read_sql_query('SELECT '
                                                               +'geographic '
@@ -126,13 +128,15 @@ class TPTFetcher():
                              sc_curr,
                              sf_curr,
                              date):
+        # TODO: remove sf_curr param
         self.logger.info(f"Fetching shareclasses nav {sc_id}")
 
         nav = pd.read_sql_query('SELECT '
                                +'nav_date, '
                                +'share_price, '
                                +'outstanding_shares, '
-                               +'shareclass_total_net_asset, '
+                               +'shareclass_total_net_asset_sc_ccy, '
+                               +'shareclass_total_net_asset_sf_ccy, '
                                +'subfund_total_net_asset '
                                +'FROM intranet.dbo.nav '
                                +f"WHERE id_shareclass='{sc_id}' "
@@ -140,17 +144,17 @@ class TPTFetcher():
                                +f"AND nav_currency='{sc_curr}'",
                                 self.connector)
         
-        nav.rename(columns={"shareclass_total_net_asset":
-                            "shareclass_total_net_asset_sc_curr"},
-                   inplace=True)
+        #nav.rename(columns={"shareclass_total_net_asset":
+        #                    "shareclass_total_net_asset_sc_curr"},
+        #           inplace=True)
 
-        nav['shareclass_total_net_asset_sf_curr'] = pd.read_sql_query('SELECT '
-                                                                     +'shareclass_total_net_asset '
-                                                                     +'FROM intranet.dbo.nav '
-                                                                     +f"WHERE id_shareclass='{sc_id}' "
-                                                                     +f"AND nav_date='{date}' "
-                                                                     +f"AND nav_currency='{sf_curr}'",
-                                                                      self.connector)
+        #nav['shareclass_total_net_asset_sf_curr'] = pd.read_sql_query('SELECT '
+        #                                                             +'shareclass_total_net_asset '
+        #                                                             +'FROM intranet.dbo.nav '
+        #                                                             +f"WHERE id_shareclass='{sc_id}' "
+        #                                                             +f"AND nav_date='{date}' "
+        #                                                             +f"AND nav_currency='{sf_curr}'",
+        #                                                              self.connector)
 
         
         self.logger.info(f"nav shape: {nav.shape}")

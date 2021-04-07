@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import math
 
 from .cash_flow import CashFlow
 from .constants import FIELDS
@@ -9,50 +10,77 @@ class SCRModule():
         self.data_bucket = data_bucket
         self.cash_flows = CashFlow(self.data_bucket)
         self.define_parameters()
-        self.sym_adj = -0.48
+        self.sym_adj = -0.0
+        
+        self.Interest_rate_risk_Up = 0
+        self.Interest_rate_risk_Down = 0
+        self.Equity_Risk_Type_1 = 0
+        self.Equity_Risk_Type_2 = 0
+        self.Property = 0
+        self.Spread_risk_of_bonds = 0
+        self.Credit_risk_Structured_Products = 0
+        self.Credit_risk_Derivatives_Up = 0
+        self.Credit_risk_Derivatives_Down = 0
+        self.Currency_risk_Up = 0
+        self.Currency_risk_Down = 0
 
     def compute_total_scr_market_risk(self):
         #submodules_list = ["IR", "EQ", "PR", "SP", "CO", "FX"]
+        submodules = ["interest_rate_risk", 
+                      "equity_risk",
+                      "property_risk",
+                      "spread_risk",
+                      "currency_risk"]
+        
+        total_SCR = 0
+        for submodule in submodules:
+            total_SCR += getattr(self.data_bucket.scr_module, f"compute_{submodule}_submodule")()
 
-        return "total SCR market risk"
+        return total_SCR
 
     def compute_interest_rate_risk_submodule(self):
         # SCR_IR_UP = TPT_report[fields["97"].sum()
         # SCR_IR_DOWN = TPT_report[fields["98"].sum()
         # max(SCR_IR_UP, SCR_IR_DOWN]])
-        return "interest rate market risk"
+        #"interest rate market risk"
+        return max(self.Interest_rate_risk_Up, self.Interest_rate_risk_Down)
 
     def compute_equity_risk_submodule(self):
         # fields["99"] = fields["26"] * (0.39 + sym_adj)
         # fields["100"] = fields["30"] * (0.49 + sym_adj)
         # /!\ derogatory assets /!\
         # SCR_eq1 = TPT_report[fields["99"]].sum()
+        SCR_eq1 = self.Equity_Risk_Type_1
         # SCR_eq2 = TPT_report[fields["100"]].sum()
-        # SCR_eq = sqrt(SCR_eq1**2 + 2*0.75*SCR_eq1*(SCR_eq2 + SCR_quinf + SCR_quinfc) + (SCR_eq2 + SCR_quinf + SCR_quinfc)**2)
-        return "equity risk market risk"
+        SCR_eq2 = self.Equity_Risk_Type_2
+        SCR_eq = math.sqrt(SCR_eq1**2 + 2*0.75*SCR_eq1*(SCR_eq2) + (SCR_eq2)**2)
+        #"equity risk market risk"
+        return SCR_eq 
 
     def compute_property_risk_submodule(self):
         # SCR_prop = SCR_bonds + SCR_sec + SCR_cd
-        return "property risk submodule"
+        # "property risk submodule"
+        return 0
 
     def compute_spread_risk_submodule(self):
-        return "spreak risk submodule"
+        # "spread risk submodule"
+        return self.Spread_risk_of_bonds
 
     def compute_currency_risk_submodule(self):
-        return "currency risk submodule"
+        return max(self.Currency_risk_Up, self.Currency_risk_Down)
 
     def compute_market_risk_concentrations_submodule(self):
         return "market risk concentration submodule"
 
     def compute_scr(self):
-        self.compute_97()
-        self.compute_98()
-        self.compute_99()
-        self.compute_100()
-        self.compute_102()
-        self.compute_105a()
-        self.compute_105b()
-
+        self.Interest_rate_risk_Up = self.compute_97()
+        self.Interest_rate_risk_Down = self.compute_98()
+        self.Equity_Risk_Type_1 = self.compute_99()
+        self.Equity_Risk_Type_2 = self.compute_100()
+        self.Spread_risk_of_bonds = self.compute_102()
+        self.Currency_risk_Up = self.compute_105a()
+        self.Currency_risk_Down = self.compute_105b()
+    
     def spread_risk_parameter(self, bond_type, duration, cqs):
         duration_group = min(duration // 5, 4)
         if bond_type == 1:
@@ -80,6 +108,8 @@ class SCRModule():
             self.data_bucket.get_processing_data([FIELDS["12"],
                                                  "valuation weight"]).apply(
                 lambda row: self.compute_97_single(row), axis=1)
+        
+        return self.data_bucket.scr[FIELDS["97"]].sum()
 
     def compute_97_single(self, row):
         if row[FIELDS["12"]][2] in ["1", "2", "5"]:
@@ -100,6 +130,7 @@ class SCRModule():
                                                  "valuation weight"]).apply(
                 lambda row: self.compute_98_single(row), axis=1)
 
+        return self.data_bucket.scr[FIELDS["98"]].sum()
     
     def compute_98_single(self, row):
         if row[FIELDS["12"]][2] in ["1", "2", "5"]:
@@ -122,11 +153,12 @@ class SCRModule():
 #        self.data_bucket.scr[FIELDS["99"]] = \
 #            self.data_bucket.get_instruments_infos().apply(
 #                lambda row: self.shock_down_type1(row), axis=1)
+        return self.data_bucket.scr[FIELDS["99"]].sum()
 
     def shock_down_type1(self, row):
         if (row[FIELDS["131"]] == "3L"
             or row[FIELDS["12"]][2:] == "22"):
-            return row["ME"] / self.data_bucket.get_shareclass_nav("shareclass_total_net_asset_sf_curr") * (0.39 + self.sym_adj/100)
+            return row["ME"] / self.data_bucket.get_shareclass_nav("shareclass_total_net_asset_sf_ccy") * (0.39 + self.sym_adj/100)
         else:
             return 0
 
@@ -137,10 +169,13 @@ class SCRModule():
                                                   "ME"]).apply(
                 lambda row: self.shock_down_type2(row), axis=1)
 
+        return self.data_bucket.scr[FIELDS["100"]].sum()
+
     def shock_down_type2(self, row):
         if row[FIELDS["131"]] in ["4", "3X"] or\
             row[FIELDS["12"]][2:] in ["B1", "B4"]:
-            return row["ME"] * (0.49 + self.sym_adj/100)
+            return row["ME"] / self.data_bucket.get_shareclass_nav("shareclass_total_net_asset_sf_ccy") * (0.49 + self.sym_adj/100)
+            
         else:
             return 0
 
@@ -156,6 +191,8 @@ class SCRModule():
                                                     FIELDS["131"],
                                                     "valuation weight"]).apply(
                 lambda row: self.shock_down_spread(row), axis=1)
+
+        return self.data_bucket.scr[FIELDS["102"]].sum()
 
     def shock_down_spread(self, row):
         #print("\n", row.name)
@@ -199,11 +236,13 @@ class SCRModule():
                                                   "valuation weight"]).apply(
                 lambda row: self.shock_up_currency(row), axis=1)
 
+        return self.data_bucket.scr[FIELDS["105a"]].sum()
+
     def shock_up_currency(self, row):
         fund_curr = self.data_bucket.get_shareclass_infos("shareclass_currency")
         quot_curr = row[FIELDS["21"]] 
         if quot_curr != fund_curr :
-            return - row["ME"] / self.data_bucket.get_shareclass_nav("shareclass_total_net_asset_sf_curr") * self.currency_risk_parameter(fund_curr, quot_curr)
+            return - row["ME"] / self.data_bucket.get_shareclass_nav("shareclass_total_net_asset_sf_ccy") * self.currency_risk_parameter(fund_curr, quot_curr)
         else:
             return 0
 
@@ -214,14 +253,16 @@ class SCRModule():
                                                   "valuation weight"]).apply(
                 lambda row: self.shock_down_currency(row), axis=1)
 
+        return self.data_bucket.scr[FIELDS["105b"]].sum()
+
     def shock_down_currency(self, row):
         fund_curr = self.data_bucket.get_shareclass_infos("shareclass_currency")
         quot_curr = row[FIELDS["21"]] 
         if quot_curr != fund_curr :
-            return row["ME"] / self.data_bucket.get_shareclass_nav("shareclass_total_net_asset_sf_curr") * self.currency_risk_parameter(fund_curr, quot_curr)
+            return row["ME"] / self.data_bucket.get_shareclass_nav("shareclass_total_net_asset_sf_ccy") * self.currency_risk_parameter(fund_curr, quot_curr)
         else:
             return 0
-    
+
     def define_parameters(self):
         self.general_bonds_param = {
             0 : {

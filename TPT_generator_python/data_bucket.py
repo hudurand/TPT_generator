@@ -137,7 +137,7 @@ class DataBucket():
                                               info="market_value_fund"))
         self.processing_data = \
             self.processing_data.join(
-                self.get_shareclass_nav(info="shareclass_total_net_asset_sc_curr", isin=ALL))
+                self.get_shareclass_nav(info="shareclass_total_net_asset_sc_ccy", isin=ALL))
         
         self.logger.debug(f"data_bucket state: {self}")
 
@@ -185,8 +185,8 @@ class DataBucket():
                                                         sc_curr,
                                                         sf_curr,
                                                         self.date)
-                nav["rate"] = nav["shareclass_total_net_asset_sc_curr"] \
-                            / nav["shareclass_total_net_asset_sf_curr"]
+                nav["rate"] = nav["shareclass_total_net_asset_sc_ccy"] \
+                            / nav["shareclass_total_net_asset_sf_ccy"]
                 nav.index = [i]
                 self.shareclass_nav = self.shareclass_nav.append(nav)
             self.shareclass_nav.index.name = "shareclass"
@@ -426,8 +426,8 @@ CURRENCY:                                        {self.shareclass_infos.loc[idx,
                 shareclass_nav += f"""
 {self.shareclass_infos.loc[idx].name}
 NAV DATE:                                        {self.shareclass_nav.loc[idx, "nav_date"]}
-TNA in shareclass currency:                      {self.shareclass_nav.loc[idx, "shareclass_total_net_asset_sc_curr"]}
-TNA in subfund currency:                         {self.shareclass_nav.loc[idx, "shareclass_total_net_asset_sf_curr"]}
+TNA in shareclass currency:                      {self.shareclass_nav.loc[idx, "shareclass_total_net_asset_sc_ccy"]}
+TNA in subfund currency:                         {self.shareclass_nav.loc[idx, "shareclass_total_net_asset_sf_ccy"]}
 TNA of subfund:                                  {self.shareclass_nav.loc[idx, "subfund_total_net_asset"]}
 ...
 """

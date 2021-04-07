@@ -122,15 +122,15 @@ class DataProcessor():
 
         shareclasses = self.data_bucket.get_subfund_shareclasses()
         navs = pd.DataFrame(index=shareclasses, 
-                            columns=["shareclass_total_net_asset_sf_curr",
+                            columns=["shareclass_total_net_asset_sf_ccy",
                                      "subfund_total_net_asset",
                                      "groups"],
                             dtype=object)
 
         #navs["groups"] = navs["groups"].astype(object)
         for isin in shareclasses:
-            navs.loc[isin, "shareclass_total_net_asset_sf_curr"] = \
-                self.data_bucket.get_shareclass_nav(isin=isin, info="shareclass_total_net_asset_sf_curr")
+            navs.loc[isin, "shareclass_total_net_asset_sf_ccy"] = \
+                self.data_bucket.get_shareclass_nav(isin=isin, info="shareclass_total_net_asset_sf_ccy")
             navs.loc[isin, "subfund_total_net_asset"] = \
                 self.data_bucket.get_shareclass_nav(isin=isin, info="subfund_total_net_asset")
             navs.at[isin, "groups"] = self.data_bucket.get_groups(isin).tolist()
@@ -150,7 +150,7 @@ class DataProcessor():
         for isin in shareclasses:
             shareclass_keys[isin].where(
                 ~(instruments["id_group"].isin(navs.loc[isin, "groups"])),
-                navs.loc[isin, "shareclass_total_net_asset_sf_curr"].astype('float64'),
+                navs.loc[isin, "shareclass_total_net_asset_sf_ccy"].astype('float64'),
                 inplace=True)
         shareclass_keys.sort_index(inplace=True)
 
@@ -174,7 +174,7 @@ class DataProcessor():
             assert_index_equal(index0, distributed.index)
             self.data_bucket.processing_data.loc[(ALL, isin), "distribution"] = distributed[isin].values
             self.data_bucket.processing_data.loc[(ALL, isin), "valuation weight"] = \
-                distributed[isin].values / self.data_bucket.get_shareclass_nav(info="shareclass_total_net_asset_sf_curr")
+                distributed[isin].values / self.data_bucket.get_shareclass_nav(info="shareclass_total_net_asset_sf_ccy")
             self.data_bucket.processing_data.loc[(ALL, isin), "distribution weight"] = \
                 self.data_bucket.processing_data.loc[(ALL, isin), "distribution"] \
                 / self.data_bucket.processing_data.loc[(ALL, isin), "market_value_fund"]
@@ -183,8 +183,8 @@ class DataProcessor():
             self.data_bucket.shareclass_infos.loc[isin, "cash"] = \
                 self.data_bucket.processing_data.xs(isin, level="shareclass").loc[
                     self.data_bucket.processing_data.xs(isin, level="shareclass")[FIELDS["12"]] == "XT72"]["distribution"].sum() \
-                * self.data_bucket.get_shareclass_nav(info="shareclass_total_net_asset_sc_curr") \
-                / self.data_bucket.get_shareclass_nav(info="shareclass_total_net_asset_sf_curr")
+                * self.data_bucket.get_shareclass_nav(info="shareclass_total_net_asset_sc_ccy") \
+                / self.data_bucket.get_shareclass_nav(info="shareclass_total_net_asset_sf_ccy")
 
     def compute_qn_det(self):
         
@@ -208,8 +208,22 @@ class DataProcessor():
                                             columns=columns)
         sp_instruments_infos.loc[cash_index, 
             "12_CIC code of the instrument"] = "XT72"
-        sp_instruments_infos.loc[fet_index, 
-            "12_CIC code of the instrument"] = "XLE2"
+
+        if len(fet_index) != 0:
+            sp_instruments_infos.loc[fet_index, 
+                "12_CIC code of the instrument"] = "XLE2"
+            sp_instruments_infos.loc[fet_index, 
+                "65_Hedging Rolling"] = "Y"
+            sp_instruments_infos.loc[fet_index, 
+                "70_Name of the underlying asset"] = instruments.loc[
+                    fet_index].apply(lambda x: 
+                        self.write_underlying_name(x), axis=1)
+            sp_instruments_infos.loc[fet_index, 
+                "71_Quotation currency of the underlying asset (C)"] = \
+                    instruments.loc[fet_index, "asset_currency"]
+        else:
+            sp_instruments_infos["65_Hedging Rolling"] = ""
+
         sp_instruments_infos.loc[other_index, 
             "12_CIC code of the instrument"] = "XT79"
         sp_instruments_infos.loc[:, 
@@ -219,15 +233,6 @@ class DataProcessor():
         sp_instruments_infos.loc[:, 
             "21_Quotation currency (A)"].update(
                 instruments.loc[sp_index, "asset_currency"])
-        sp_instruments_infos.loc[fet_index, 
-            "65_Hedging Rolling"] = "Y"
-        sp_instruments_infos.loc[fet_index, 
-            "70_Name of the underlying asset"] = instruments.loc[
-                fet_index].apply(lambda x: 
-                    self.write_underlying_name(x), axis=1)
-        sp_instruments_infos.loc[fet_index, 
-            "71_Quotation currency of the underlying asset (C)"] = \
-                instruments.loc[fet_index, "asset_currency"]
         
         sp_instruments_infos.loc[:, "46_Issuer name"] = self.data_bucket.get_fund_infos("depositary_name")
         sp_instruments_infos.loc[:, "47_Issuer identification code"] = self.data_bucket.get_fund_infos("fund_issuer_code")
@@ -421,9 +426,12 @@ class DataProcessor():
             if row[FIELDS["54"]][0] not in ["K","T"]:
                 return 9
         
-        self.data_bucket.instruments_infos[FIELDS["137"]] = \
-            self.data_bucket.instruments_infos.apply(lambda row: select_value(row), axis=1)
-    
+        try:
+            self.data_bucket.instruments_infos[FIELDS["137"]] = \
+                self.data_bucket.instruments_infos.apply(lambda row: select_value(row), axis=1)
+        except:
+            breakpoint()
+
     def compute_market_exposure(self):
         pattern = "..22|..A2|..B4"
         self.data_bucket.processing_data["ME"] = \
