@@ -136,7 +136,7 @@ class CashFlow():
         col_names = ["dates", "EUR", "DKK", "HUF", "NOK", "PLN", "RUB", "SEK",
                      "CHF", "GBP", "AUD", "CAD", "HKD", "INR", "JPY", "MYR",
                      "SGD", "KRW", "TWD", "USD"]
-        
+
         if not (root_path / RFR_feather).exists():
             self.RFR = pd.read_excel(root_path / CF_file_name,
                                      sheet_name="rfr",

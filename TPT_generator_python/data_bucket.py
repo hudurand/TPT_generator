@@ -55,6 +55,7 @@ class DataBucket():
         self.scr_module = SCRModule(self)
 
         self.logger.info("Bucket initialised")
+        self.logger.debug(f"data_bucket state: {self}")
        
     def fetch(self):
         """
@@ -137,6 +138,8 @@ class DataBucket():
         self.processing_data = \
             self.processing_data.join(
                 self.get_shareclass_nav(info="shareclass_total_net_asset_sc_curr", isin=ALL))
+        
+        self.logger.debug(f"data_bucket state: {self}")
 
     def get_shareclass_infos(self, info=None, isin=None):
         """
@@ -155,6 +158,8 @@ class DataBucket():
             self.shareclass_infos = self.shareclass_infos.append(
                 self.fetcher.fetch_shareclass_infos(
                     other_isins).set_index("code_isin"))
+
+            self.logger.debug(f"data_bucket state: {self}")
 
         if isin is None and info is None:
             return self.shareclass_infos.loc[self.shareclass_isin]
@@ -185,6 +190,8 @@ class DataBucket():
                 nav.index = [i]
                 self.shareclass_nav = self.shareclass_nav.append(nav)
             self.shareclass_nav.index.name = "shareclass"
+            
+            self.logger.debug(f"data_bucket state: {self}")
 
         #print(self.shareclass_nav)
         if isin is None and info is None:
@@ -226,6 +233,8 @@ class DataBucket():
         if self.subfund_infos is None:
             id_subfund = self.get_shareclass_infos(info="id_subfund")
             self.subfund_infos = self.fetcher.fetch_subfund_infos(id_subfund)
+            
+            self.logger.debug(f"data_bucket state: {self}")
         
         #TODO: move to processor?
         self.subfund_infos["subfund_indicator"] = \
@@ -241,6 +250,8 @@ class DataBucket():
             fund_id = self.get_subfund_infos("id_fund")
             self.fund_infos = self.fetcher.fetch_fund_infos(fund_id)
 
+            self.logger.debug(f"data_bucket state: {self}")
+
         if info is None:
             return self.fund_infos
         else:
@@ -255,6 +266,8 @@ class DataBucket():
             self.instruments = self.fetcher.fetch_instruments(id_subfund,
                                                               self.date)
             self.processor.process_instruments()
+
+            self.logger.debug(f"data_bucket state: {self}")
 
         return self.instruments.loc[idx, info]
         
@@ -312,6 +325,8 @@ class DataBucket():
             self.processor.process_instruments_infos()
             self.instruments_infos.index.names = ["instrument"]
 
+            self.logger.debug(f"data_bucket state: {self}")
+
         if idx is None:
             return self.instruments_infos.loc[self.get_instruments().index,
                                               info]
@@ -322,6 +337,8 @@ class DataBucket():
         if self.processing_data is None:
             self.logger.info("Computing processing data")
             self.processor.compute_processing_data()
+
+            self.logger.debug(f"data_bucket state: {self}")
 
         vec = self.processing_data.loc[(ALL, self.shareclass_isin), "distribution"]
         vec = vec.droplevel("shareclass")

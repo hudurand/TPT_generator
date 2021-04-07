@@ -2,6 +2,12 @@
 
 In this section are detailed the implementation and development guidelines followed for writing reporting tools. 
 
+## Installation
+
+### On Windows
+
+### (On linux)
+
 ## Production cycle
 
 database -> processing -> report
@@ -16,9 +22,15 @@ See detais on Wiki
 - simple patterns/guidelines: chain of responsibility, separation of concerns, python's mixed patterns (couple data-containers and ops)
 - simple inheritance patterns (2levels max: parent-childs)
 
-## Implementation design
+## Architecture overview
 
-AOR is used in CLI through th aor.py file:  
+Here is a modelisation of the data flux during the generation of a report.
+
+![modelisation](Generator_V0.1.svg){: .center}
+
+## Implementation details
+
+AOR is used in CLI through the aor.py file:  
 
 For each reports, two function are available: one to generate a single report from command line and another to generate one or multiple reports from a config file.
 
@@ -33,8 +45,10 @@ Each reporting tool should follow the same architecture:
 - The processor makes sure that the required data has been acquired and call the processing modules.
 - The DataBucket uses the chain of responsibility pattern to call the fetcher on the data it's missing.
 
-## Architecture overview
+??? "Generator"
 
-Here is a modelisation of the data flux during the generation of a report.
+??? "Data Bucket"
 
-![modelisation](Generator_V0.1.svg){: .center}
+??? "Fetcher"
+
+??? "Processor"

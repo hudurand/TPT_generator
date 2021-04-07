@@ -1,22 +1,22 @@
 ![logo](5d07dc3917bf6193f2e37f9b_logo-AO-long.svg)
 # Welcome to AlphaOmega reporting documentation
 
-This documentation details the implementation and methodology adopted to generate each reports.
+This documentation details the implementation and methodology adopted to generate reports.
 
 The reporting tool was built in python to automate the production of TPT reports with the goal to later be extended into a more general framework for automating the production of reports and be integrated into the DEM application. It uses pandas as its main processing engine and access the data it require with SQL.
 
 As the goal is to create a framework for building reporting tools, it was built in a modular fashion following a domain driven design, dedicating a separate module for each logical unit of the domain (SCR, cash-flow, distribution...). The guideline being to write code that is easily maintainable and extendable.
 
-## Overview
+## Content
 
 - [Developer guide](developer.md)
     - [Production cycle](developer/#production-cycle)
     - [General principles](developer/#general-principles)
     - [Implementation design](developer/#implementation-design)
     - [Architecture overview](developer/#architecture-overview)
-- TPT Solvency II
+- [TPT Solvency II](methodology.md)
     - [Methodology](methodology.md)
-        - [Methodology](methodology/#required-data)
+        - [Required data](methodology/#required-data)
         - [Sections](methodology/#sections)
     - [Implementation](implementation.md)
         - [Modelisation](implementation/#modelisation)
@@ -25,13 +25,32 @@ As the goal is to create a framework for building reporting tools, it was built 
 
 ## Commands
 
-* `python ./generate_TPT_report.py generate_from_config <config-file>` - generate one or multiple TPT report from a config file.
+`python ./aor.py generate_from_config <config-file>` - generate one or multiple TPT report from a config file.
+
+## Configuration file
+
+```yaml
+date: 'YYYY-MM-DD'
+symmetric_adjustment: %
+source_dir: './data'                   # should be removed in the future
+output_dir: './production/client'
+client: 'client'
+reports:
+    TPT:
+        shareclasses: 
+            - LU0123456789
+            - LU1234567890
+            - LU2345678901
+            - LU3456789012
+            - LU4567890123
+            - LU5678901234
+```
 
 ## Project layout
 
 ```
  |- README.md                          # Installation and usage instructions.
- |- generate_TPT_report.py
+ |- aor.py
  |- run_fetcher.py
  |- run_generator.py
  |- configs/                           # The configuration files.
@@ -47,7 +66,7 @@ As the goal is to create a framework for building reporting tools, it was built 
  |   |  ...
 ```
 
-## TODOS
+## Road map
 - [ ] TPT
     - [ ] CQS mapping
     - [ ] Complete SCR module (filling SCR sheet)

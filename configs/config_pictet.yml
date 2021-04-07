@@ -1,8 +1,8 @@
 date: '2020-12-31'
 symmetric_adjustment: -0.48
 source_dir: './data'
-output_dir: './production/Pictet'
-client: 'Pictet'
+output_dir: './production/client'
+client: 'client'
 reports:
     TPT:
         shareclasses: 

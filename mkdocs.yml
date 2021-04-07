@@ -1,14 +1,15 @@
 site_name: Reporting
 nav:
-    - Overview: index.md
-    - Developer guide: developer.md
-    - TPT Solvency II:
-        - Methodology: methodology.md
-        - Implementation: implementation.md
-        - Debugging: debugging.md
-    - Reference: 
-        - Base: reference.md
-        - TPT Solvency II: reference_tpt.md
+    - test:
+        - Overview: index.md
+        - Developer guide: developer.md
+        - TPT Solvency II:
+            - Methodology: methodology.md
+            - Implementation: implementation.md
+            - Debugging: debugging.md
+        - Reference: 
+            - Base: reference.md
+            - TPT Solvency II: reference_tpt.md
         
 theme:
     name: "material"

@@ -126,7 +126,7 @@ class SCRModule():
     def shock_down_type1(self, row):
         if (row[FIELDS["131"]] == "3L"
             or row[FIELDS["12"]][2:] == "22"):
-            return row["ME"] * (0.39 + self.sym_adj/100)
+            return row["ME"] / self.data_bucket.get_shareclass_nav("shareclass_total_net_asset_sf_curr") * (0.39 + self.sym_adj/100)
         else:
             return 0
 
@@ -203,7 +203,7 @@ class SCRModule():
         fund_curr = self.data_bucket.get_shareclass_infos("shareclass_currency")
         quot_curr = row[FIELDS["21"]] 
         if quot_curr != fund_curr :
-            return row["ME"] * self.currency_risk_parameter(fund_curr, quot_curr)
+            return - row["ME"] / self.data_bucket.get_shareclass_nav("shareclass_total_net_asset_sf_curr") * self.currency_risk_parameter(fund_curr, quot_curr)
         else:
             return 0
 
@@ -218,7 +218,7 @@ class SCRModule():
         fund_curr = self.data_bucket.get_shareclass_infos("shareclass_currency")
         quot_curr = row[FIELDS["21"]] 
         if quot_curr != fund_curr :
-            return - row["ME"] * self.currency_risk_parameter(fund_curr, quot_curr)
+            return row["ME"] / self.data_bucket.get_shareclass_nav("shareclass_total_net_asset_sf_curr") * self.currency_risk_parameter(fund_curr, quot_curr)
         else:
             return 0
     

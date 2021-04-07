@@ -1,6 +1,5 @@
 import pandas as pd
 import numpy as np
-import re
 from collections import OrderedDict
 from pathlib import Path
 import openpyxl
@@ -74,7 +73,7 @@ class TPTGenerator():
         """
         overloads __repr__ function for logging and easier debugging.
         """
-        if self.report:
+        if self.report is not None:
             n = self.report.shape[0]
         else:
             n = self.report
@@ -134,7 +133,7 @@ class TPTGenerator():
 
     def fill_report(self):
         """
-        Fills-in all data into the 
+        Fills-in all data into the report
         """
 
         self.logger.info("Filling report")
@@ -192,6 +191,79 @@ class TPTGenerator():
                     else:
                         report.cell(row=row_idx+1, column=column_map[col_idx], value=value)
                         report.cell(row=row_idx+1, column=column_map[col_idx]).alignment = Alignment(horizontal='center')
+        
+        # fill SCR sheet
+        scr_sheet = template.get_sheet_by_name('SCR')
+        scr_sheet.cell(row=2, column=2, value=self.data_bucket.get_shareclass_infos("shareclass_name"))
+        
+        # shareclass' infos
+        scr_sheet.cell(row=6, column=3, value="date")
+        scr_sheet.cell(row=7, column=3, value="fund name")
+        scr_sheet.cell(row=8, column=3, value="isin")
+        scr_sheet.cell(row=9, column=3, value="CCY")
+        scr_sheet.cell(row=10, column=3, value="NAV")
+
+        # sub-module detail
+        scr_sheet.cell(row=16, column=3, value="capreq")
+        scr_sheet.cell(row=16, column=4, value="%")
+        scr_sheet.cell(row=17, column=3, value="capreq")
+        scr_sheet.cell(row=17, column=4, value="%")
+        scr_sheet.cell(row=18, column=3, value="capreq")
+        scr_sheet.cell(row=18, column=4, value="%")
+        scr_sheet.cell(row=19, column=3, value="capreq")
+        scr_sheet.cell(row=19, column=4, value="%")
+        scr_sheet.cell(row=20, column=3, value="capreq")
+        scr_sheet.cell(row=20, column=4, value="%")
+        
+        # risks specific detail
+        scr_sheet.cell(row=23, column=3, value="capreq")
+        scr_sheet.cell(row=23, column=3, value="%")
+        scr_sheet.cell(row=24, column=3, value="capreq")
+        scr_sheet.cell(row=24, column=3, value="%")
+        scr_sheet.cell(row=25, column=3, value="capreq")
+        scr_sheet.cell(row=25, column=3, value="%")
+        scr_sheet.cell(row=26, column=3, value="capreq")
+        scr_sheet.cell(row=26, column=3, value="%")
+        scr_sheet.cell(row=27, column=3, value="capreq")
+        scr_sheet.cell(row=27, column=3, value="%")
+        scr_sheet.cell(row=28, column=3, value="capreq")
+        scr_sheet.cell(row=28, column=3, value="%")
+        scr_sheet.cell(row=29, column=3, value="capreq")
+        scr_sheet.cell(row=29, column=3, value="%")
+        scr_sheet.cell(row=30, column=3, value="capreq")
+        scr_sheet.cell(row=30, column=3, value="%")
+        scr_sheet.cell(row=31, column=3, value="capreq")
+        scr_sheet.cell(row=31, column=3, value="%")
+        scr_sheet.cell(row=32, column=3, value="capreq")
+        scr_sheet.cell(row=32, column=3, value="%")
+        scr_sheet.cell(row=33, column=3, value="capreq")
+        scr_sheet.cell(row=33, column=3, value="%")
+        scr_sheet.cell(row=34, column=3, value="capreq")
+        scr_sheet.cell(row=34, column=3, value="%")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
         # save produced report
         template.save(self.output_dir / output_file_name)
@@ -786,9 +858,8 @@ class TPTGenerator():
             self.data_bucket.get_subfund_infos("subfund_cic")
 
     def fill_column_123a(self):
-        pass
-    #    self.report.loc[:,self.fields["123a"]] = \
-    #        self.data_bucket.get_fund_infos("depositary_country")
+        self.report.loc[:,self.fields["123a"]] = \
+            self.data_bucket.get_fund_infos("depositary_country") #OK
 
     def fill_column_124(self):
         self.fill_column_10()
@@ -836,9 +907,8 @@ class TPTGenerator():
         pass
 
     def fill_column_133(self):
-        pass
-        #self.report.loc[:,self.fields["133"]] = \
-        #    self.data_bucket.get_fund_infos("depositary_name")
+        self.report.loc[:,self.fields["133"]] = \
+            self.data_bucket.get_fund_infos("depositary_name")
 
     def fill_column_134(self):
         pass

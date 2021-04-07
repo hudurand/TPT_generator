@@ -9,7 +9,7 @@ from .constants import DB_INSTRUMENTS_INFOS_MAP
 
 class TPTFetcher():
     """
-    fecther class to fecth data associated 
+    fetcher class to fetch data associated 
     to a client or shareclass from database
     required to fill the TPT report
     """
@@ -18,6 +18,7 @@ class TPTFetcher():
                  source_dir=None):
         self.logger = logging.getLogger(__name__)
         self.logger.info("Initialising fetcher...")
+
         self.connector = pyodbc.connect('driver={SQL Server};'
                                        +'Server=DESKTOP-RGN6M86;'
                                        +'Database=intranet;'
@@ -75,23 +76,24 @@ class TPTFetcher():
         self.logger.info("Fetching subfund infos")
         
         subfund_infos = pd.read_sql_query('SELECT '
-                                              +'id, '
-                                              +'subfund_name, '
-                                              +'subfund_code, '
-                                              +'subfund_cic, '
-                                              +'subfund_nace, '
-                                              +'subfund_lei, '
-                                              +'subfund_currency, '
-                                              +'id_fund '
-                                              +'FROM intranet.dbo.subfund '
-                                              +f"WHERE id='{subfund_id}'", 
-                                               self.connector)
+                                         +'id, '
+                                         +'subfund_name, '
+                                         +'subfund_code, '
+                                         +'subfund_cic, '
+                                         +'subfund_nace, '
+                                         +'subfund_lei, '
+                                         +'subfund_currency, '
+                                         +'id_fund '
+                                         +'FROM intranet.dbo.subfund '
+                                         +f"WHERE id='{subfund_id}'", 
+                                          self.connector)
+
+        self.logger.info(f"subfund_infos shape: {subfund_infos.shape}")
 
         return subfund_infos
 
     def fetch_fund_infos(self, fund_id):
         self.logger.info("Fetching fund infos")
-        
         fund_infos = pd.read_sql_query('SELECT '
                                       +'fund_name, '
                                       +'fund_issuer_group_code, '
@@ -113,6 +115,10 @@ class TPTFetcher():
                                                               +'FROM intranet.dbo.iso_code '
                                                               +f"WHERE iso_code_2='{fund_infos['fund_country'].iloc[0]}'",
                                                                self.connector)
+
+        
+        self.logger.info(f"fund_infos shape: {fund_infos.shape}")
+
         return fund_infos
 
     def fetch_shareclass_nav(self,
@@ -144,7 +150,10 @@ class TPTFetcher():
                                                                      +f"WHERE id_shareclass='{sc_id}' "
                                                                      +f"AND nav_date='{date}' "
                                                                      +f"AND nav_currency='{sf_curr}'",
-                                                                      self.connector)    
+                                                                      self.connector)
+
+        
+        self.logger.info(f"nav shape: {nav.shape}")
         return nav
 
     def fetch_subfund_shareclasses(self, id_subfund):
@@ -156,6 +165,8 @@ class TPTFetcher():
                                  +f"WHERE id_subfund='{id_subfund}'"
                                  +"AND supprime=0",
                                   self.connector)
+
+        self.logger.info(f"number of shareclass in subfund: {isins.shape[0]}")
 
         return isins["code_isin"].tolist()
 
@@ -180,7 +191,10 @@ class TPTFetcher():
                            "market_value_asset",
                            "maturity_date",
                            "grouping_id",
-                           "id_group"])
+                           "id_group",
+                           "rating_moodys",
+                           "rating_sp",
+                           "rating_fitch"])
 
         query = (f"SELECT {infos} FROM intranet.dbo.portfolio_data d "
                 +"INNER JOIN portfolio p ON p.id = d.id_portfolio "
@@ -189,6 +203,8 @@ class TPTFetcher():
 
         instruments = pd.read_sql_query(query,
                                         self.connector)
+
+        self.logger.info(f"instruments shape: {instruments.shape}")
 
         return instruments
 
@@ -217,6 +233,9 @@ class TPTFetcher():
 
         self.bloomberg_infos = self.bloomberg_infos[~self.bloomberg_infos.index.duplicated()]
         db_instruments_infos = pd.concat([db_instruments_infos, self.bloomberg_infos], axis=1)
+
+        self.logger.info(f"db_instruments_infos shape: {db_instruments_infos.shape}")
+
         return db_instruments_infos
   
     def fetch_missing_infos(self, id_list):

@@ -1,0 +1,21 @@
+date: '2021-03-31'
+symmetric_adjustment: 0.
+source_dir: './data/pictet_20210331'
+output_dir: './production/pictet_20210331'
+client: 'pictet'
+reports:
+    TPT:
+        shareclasses:
+          - LU1787059465
+          - LU1787059036
+          - LU1787061107
+          - LU1787061362
+          - LU1787061529
+          - LU1787060471
+          #- LU1778254844
+          #- LU0435791347
+          - LU0988536776
+          - LU0276761110
+          - LU1314011914
+          - LU1314012052
+          - LU1148177246

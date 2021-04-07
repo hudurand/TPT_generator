@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import logging
-from .constants import DB_INSTRUMENTS_INFOS_MAP, FIELDS, ALL
+from .constants import DB_INSTRUMENTS_INFOS_MAP, FIELDS, ALL, RATINGS
 from pandas.testing import assert_index_equal
 
 
@@ -16,8 +16,14 @@ class DataProcessor():
 
     def process_instruments(self):
         self.logger.info("processing instruments")
+        self.logger.info(f"instruments shape: {self.data_bucket.instruments.shape}")
+        self.logger.debug(f"""
+        instruments:
+{self.data_bucket.instruments} 
+        """)
 
         self.data_bucket.instruments.rename(columns={"asset_id_string":"instrument"}, inplace=True)
+        self.data_bucket.instruments["instrument"] = self.data_bucket.instruments["instrument"].astype('str')
         self.data_bucket.instruments.set_index("instrument", inplace=True)
 
         if self.data_bucket.instruments.index.duplicated().any():
@@ -54,9 +60,16 @@ class DataProcessor():
         elif self.data_bucket.client == "Dynasty":
             self.data_bucket.instruments["market_value_asset"] = self.data_bucket.instruments["clear_value_asset"] + self.data_bucket.instruments["accrued_asset"]
         
+        self.logger.info("processed instruments")
+        self.logger.info(f"instruments shape: {self.data_bucket.instruments.shape}")
+        self.logger.debug(f"""
+        instruments:
+{self.data_bucket.instruments} 
+        """)
 
     def clean_instruments_infos(self):
-        self.logger.info("cleaning instruments")
+        self.logger.info("cleaning instruments infos")
+        self.logger.info(f"instruments_infos shape: {self.data_bucket.instruments_infos.shape}")
 
         self.data_bucket.instruments_infos.loc[:,
             "16_Grouping code for multiple leg instruments"
@@ -184,6 +197,8 @@ class DataProcessor():
         self.data_bucket.processing_data = self.data_bucket.processing_data.join(self.data_bucket.instruments["QN"])
 
     def set_sp_instrument_infos(self):
+        self.logger.info("setting specific instruments infos")
+        
         columns = DB_INSTRUMENTS_INFOS_MAP.values()
         instruments = self.data_bucket.get_instruments_by_index(ALL)
         cash_index, fet_index, other_index = self.loc_sp_instruments()
@@ -222,78 +237,48 @@ class DataProcessor():
         sp_instruments_infos.loc[:, "53_Issuer economic area"] = self.data_bucket.get_fund_infos("issuer_economic_area")
         sp_instruments_infos.loc[:, "54_Economic sector"] = self.data_bucket.get_fund_infos("depositary_nace")
         
+        self.logger.info(f"specific instruments infos shape: {sp_instruments_infos.shape}")
+        self.logger.debug(f"""
+        cash instruments infos: {len(cash_index)}
+{sp_instruments_infos.loc[cash_index, ['12_CIC code of the instrument',
+                                       '54_Economic sector',
+                                       '70_Name of the underlying asset']]} 
+        """)
+        self.logger.debug(f"""
+        fet instruments infos: {len(fet_index)}
+{sp_instruments_infos.loc[fet_index, ['12_CIC code of the instrument',
+                                       '54_Economic sector',
+                                       '70_Name of the underlying asset']]} 
+        """)
+        self.logger.debug(f"""
+        other instruments infos: {len(other_index)}
+{sp_instruments_infos.loc[other_index, ['12_CIC code of the instrument',
+                                       '54_Economic sector',
+                                       '70_Name of the underlying asset']]} 
+        """)
+
         return sp_instruments_infos
 
 
     def loc_sp_instruments(self):
-        client = self.data_bucket.client
         instruments = self.data_bucket.get_instruments_by_index(ALL)
 
-        if client == "Pictet":
-            CASH = instruments.index[
-                instruments["asset_type"] == "CASH"].astype('str').to_list()
+        CASH = instruments.index[
+            instruments["asset_type"] == "CASH"].astype('str').to_list()
 
-            FET = instruments.index[
-                instruments["asset_type"] == "CAT"].astype('str').to_list()
+        FET = instruments.index[
+            instruments["asset_type"] == "CAT"].astype('str').to_list()
 
-            OTHER = instruments.index[
-                instruments["asset_type"] == "TRES"].astype('str').to_list()
+        OTHER = instruments.index[
+            instruments["asset_type"] == "TRES"].astype('str').to_list()
 
-        if client == "BIL":
-            CASH = instruments.index[
-                instruments["asset_type_3"] == "CASH"].astype('str').to_list()
-
-            FET = instruments.index[
-                instruments["asset_type_3"] == "F.E.T."].astype('str').to_list()
-
-            OTHER = []
-            OTHER += instruments.index[
-                instruments["asset_type_3"] == "ACCRUED EXP."].astype('str').to_list()
-            OTHER += instruments.index[
-                instruments["asset_type_3"] == "RECEIVABLES"].astype('str').to_list()
-            OTHER += instruments.index[
-                instruments["asset_type_3"] == "PAYABLES"].astype('str').to_list()
-    
-        if client == "Dynasty":
-            CASH = instruments.index[
-                instruments["asset_type"] == "T010 - Current cash account"].astype('str').to_list()
-
-            FET = instruments.index[
-                instruments["asset_type"] == "221 - Forward Exchange Trades (FET)"].astype('str').to_list()
-
-            OTHER = []
-            OTHER += instruments.index[
-                instruments["asset_type"] == "T035 - Cash Collateral given"].astype('str').to_list()
-            OTHER += instruments.index[
-                instruments["asset_type"] == "T061 - Amortisation Formation Expenses"].astype('str').to_list()
-            OTHER += instruments.index[
-                instruments["asset_type"] == "T060 - Fees to be paid"].astype('str').to_list()
-            OTHER += instruments.index[
-                instruments["asset_type"] == "902 - Interests Receivable / Payable"].astype('str').to_list()
-            OTHER += instruments.index[
-                instruments["asset_type"] == "T043 - Cash payable redemptions"].astype('str').to_list()
-            OTHER += instruments.index[
-                instruments["asset_type"] == "T042 - Cash receivable subscriptions"].astype('str').to_list()
-            OTHER += instruments.index[
-                instruments["asset_type"] == "T070 - Miscellaneous income"].astype('str').to_list()
-            OTHER += instruments.index[
-                instruments["asset_type"] == "T040 - Cash receivable sales"].astype('str').to_list()
-            OTHER += instruments.index[
-                instruments["asset_type"] == "T037 - Transitory collateral account"].astype('str').to_list()
-            OTHER += instruments.index[
-                instruments["asset_type"] == "T031 - Cash Collateral Received"].astype('str').to_list()
-            OTHER += instruments.index[
-                instruments["asset_type"] == "T041 - Cash payable purchases"].astype('str').to_list()
-            OTHER += instruments.index[
-                instruments["asset_type"] == "901 - Dividends Receivable / Payable"].astype('str').to_list()
         return CASH, FET, OTHER
   
     def compute_strike_prices(self):
         forward_strike_price = self.data_bucket.get_instruments_by_index(
             ALL,
-            info="grouping_id"
+            info="grouping_id",
             ).apply(lambda x: self.compute_strike_price_single(x))
-
         self.data_bucket.instruments_infos["61_Strike price"].where(forward_strike_price.isnull(),
                                                                     forward_strike_price,
                                                                     inplace=True) 
@@ -353,6 +338,35 @@ class DataProcessor():
         
         self.data_bucket.instruments_infos[FIELDS["59"]] = \
             self.data_bucket.instruments_infos.apply(lambda row: select_value(row), axis=1)
+
+        def map_ratings(x, y):
+            if y is not None: 
+                return RATINGS[x.name][y]
+        def sort_and_select(x):
+            x.sort()
+            i = min(len(x), 2)-1
+            return x[i]
+
+        ratings = self.data_bucket.get_instruments(['rating_moodys','rating_sp','rating_fitch'])
+        ratings = ratings.loc[~(ratings.isnull().all(axis=1))]
+        #breakpoint()
+        ratings.replace({"u": "",
+                 "p": "",
+                 " \*\+": "",
+                 " \*\-": "",
+                 "e": "",
+                 "(P)": "",
+                 "(EXP)": "",
+                 "-e": "",
+                 "\+\+": "+",
+                 " \*": ""}, regex=True, inplace=True)
+        ratings.replace(["WD", "NA", "NR"], None, regex=True, inplace=True)
+        ratings = ratings.apply(lambda x: x.apply(lambda y: map_ratings(x,y)))
+        CQS = ratings.apply(lambda x: x.dropna().tolist(), axis=1)
+        CQS = CQS.apply(lambda x: sort_and_select(x))
+
+        self.data_bucket.instruments_infos[FIELDS["59"]].update(CQS)
+
 
     def compute_131(self):
         def select_value(row):
@@ -433,6 +447,7 @@ class DataProcessor():
             main_ccy = row[FIELDS["21"]]
             underlying_ccy = row[FIELDS["71"]]
         
+            # GBp is pence: must divide by 100 the price of underlying
             if main_ccy != underlying_ccy:
                 EX = self.fetcher.ccy.loc[main_ccy + underlying_ccy, "rate"]
             else: 

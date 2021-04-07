@@ -58,6 +58,18 @@ from TPT_generator_python import DataBucket
         #pytest.param(("Dynasty", "LU1586707801", "2020-12-31", "AO_TPT_V5.0_Dynasty High Yield 2026 A USD_LU1586707801_20201231.xlsx"), id="LU1586707801_Dynasty"),
         #pytest.param(("Dynasty", "LU1073013564", "2020-12-31", "AO_TPT_V5.0_Dynasty High Yield 2026 B EUR_LU1073013564_20201231.xlsx"), id="LU1073013564_Dynasty"),
         #pytest.param(("Dynasty", "LU1280365120", "2020-12-31", "AO_TPT_V5.0_Dynasty High Yield 2026 D EUR_LU1280365120_20201231.xlsx"), id="LU1280365120_Dynasty"),
+        pytest.param(("Pictet", "LU1787059465", "2020-12-31", "AO_TPT_V5.0_DECALIA SICAV-CIRCULAR ECONOMY - A1E_LU1787059465_20201231.xlsx"), id="LU1787059465_Pictet"),
+        pytest.param(("Pictet", "LU1787059036", "2020-12-31", "AO_TPT_V5.0_DECALIA SICAV-CIRCULAR ECONOMY - A1U_LU1787059036_20201231.xlsx"), id="LU1787059036_Pictet"),
+        pytest.param(("Pictet", "LU1787061107", "2020-12-31", "AO_TPT_V5.0_DECALIA SICAV-CIRCULAR ECONOMY - I_LU1787061107_20201231.xlsx"), id="LU1787061107_Pictet"),
+        pytest.param(("Pictet", "LU1787061362", "2020-12-31", "AO_TPT_V5.0_DECALIA SICAV-CIRCULAR ECONOMY - IC_LU1787061362_20201231.xlsx"), id="LU1787061362_Pictet"),
+        pytest.param(("Pictet", "LU1787061529", "2020-12-31", "AO_TPT_V5.0_DECALIA SICAV-CIRCULAR ECONOMY - IE_LU1787061529_20201231.xlsx"), id="LU1787061529_Pictet"),
+        pytest.param(("Pictet", "LU1787060471", "2020-12-31", "AO_TPT_V5.0_DECALIA SICAV-CIRCULAR ECONOMY - R_LU1787060471_20201231.xlsx"), id="LU1787060471_Pictet"),
+        pytest.param(("Pictet", "LU1778254844", "2020-12-31", "AO_TPT_V5.0_HEREFORD FUNDS-BIN YUAN GREATER CHINA FUND - Class CI USD_LU1778254844_20201231.xlsx"), id="LU1778254844_Pictet"),
+        pytest.param(("Pictet", "LU0435791347", "2020-12-31", "AO_TPT_V5.0_HEREFORD FUNDS-DGHM US ALL-CAP VALUE FUND - Class AI USD_LU0435791347_20201231.xlsx"), id="LU0435791347_Pictet"),
+        pytest.param(("Pictet", "LU0988536776", "2020-12-31", "AO_TPT_V5.0_TARENO FUNDS-DIVERSIFIED INDEX INVESTING EQUITIES-BONDS-REAL ASSETS - A EUR_LU0988536776_20201231.xlsx"), id="LU0988536776_Pictet"),
+        pytest.param(("Pictet", "LU0276761110", "2020-12-31", "AO_TPT_V5.0_TARENO FUNDS-ENHANCED INDEX INVESTING EQUITIES - A EUR_LU0276761110_20201231.xlsx"), id="LU0276761110_Pictet"),
+        pytest.param(("Pictet", "LU1314011914", "2020-12-31", "AO_TPT_V5.0_TARENO FUNDS-VALUE-OPPORTUNITY EQUITIES - AA_LU1314011914_20201231.xlsx"), id="LU1314011914_Pictet"),
+        pytest.param(("Pictet", "LU1314012052", "2020-12-31", "AO_TPT_V5.0_TARENO FUNDS-VALUE-OPPORTUNITY EQUITIES - BB_LU1314012052_20201231.xlsx"), id="LU1314012052_Pictet"),
         ])
 
 
@@ -115,6 +127,8 @@ def reference_report(params_fixt):
     report.replace({"VERSE": "sell"}, regex=True, inplace=True)
     report.replace({"RECU": "buy"}, regex=True, inplace=True)
     report.replace({"RBC Investor Services Bank S.A.": "RBC Luxembourg"}, regex=True, inplace=True)
+    report.replace({"Decalia Asset Management SA": "Decalia SICAV"}, regex=True, inplace=True)
+    report.replace({"DECALIA SICAV-CIRCULAR ECONOMY": "Decalia SICAV - Circular Economy"}, regex=True, inplace=True)
     report["125_Accrued Income (Security Denominated Currency)"].fillna(0, inplace=True)
     report["126_Accrued Income (Portfolio Denominated Currency)"].fillna(0, inplace=True)
     #report["59_Credit quality step"].replace({9 : 3}, inplace=True)
@@ -129,6 +143,7 @@ def reference_report(params_fixt):
     report["133_custodian_name"].replace({"RBC Luxembourg":"RBC Investor Services Bank S.A."}, regex=True, inplace=True)
 
     report.rename(columns={"14_Identification code of the financial instrument":"instrument"}, inplace=True)
+    report["instrument"] = report["instrument"].astype('str')
     report.set_index("instrument", inplace=True)
     report.insert(14, "14_Identification code of the financial instrument", report.index)
 
@@ -229,6 +244,15 @@ def test_get_instruments(data_bucket, reference_report):
     """
     
     instruments = data_bucket.get_instruments()
+
+    prod = instruments.sort_index().index
+    ref = reference_report.sort_index().index
+    
+    print(ref)
+    diff1 = prod[~(prod.isin(ref))]
+    print("in prod but not in ref:", diff1)
+    diff2 = ref[~(ref.isin(prod))]
+    print("in ref but not in prod:", diff2)
 
     assert len(instruments.index) == len(reference_report.index)
 
@@ -459,8 +483,7 @@ def test_fill_column_18(generator, reference_report):
     print(diff2)
 
     assert_series_equal(column, ref_col, 
-                        check_dtype=False,
-                        check_exact=False)
+                        check_dtype=False)
 
 def test_fill_column_19(generator, reference_report):
 
@@ -536,8 +559,8 @@ def test_fill_column_23(generator, reference_report):
     prod = generator.report.sort_index()
     ref = reference_report.sort_index()
 
-    column = pd.to_numeric(prod["23_Clean market valuation in quotation currency (A)"]).round(5)
-    ref_col = pd.to_numeric(ref["23_Clean market valuation in quotation currency (A)"]).round(5)
+    column = pd.to_numeric(prod["23_Clean market valuation in quotation currency (A)"]).round(2)
+    ref_col = pd.to_numeric(ref["23_Clean market valuation in quotation currency (A)"]).round(2)
 
     diff1 = column.loc[column != ref_col]
     print(diff1)
@@ -1527,8 +1550,8 @@ def test_fill_column_105a(generator, reference_report):
     prod = generator.report.sort_index()
     ref = reference_report.sort_index()
 
-    column = pd.to_numeric(prod["105a_SCR_Mrkt_FX_up weight over NAV"]).round(12)
-    ref_col = pd.to_numeric(ref["105a_SCR_Mrkt_FX_up weight over NAV"]).round(12)
+    column = pd.to_numeric(prod["105a_SCR_Mrkt_FX_up weight over NAV"]).round(5)
+    ref_col = pd.to_numeric(ref["105a_SCR_Mrkt_FX_up weight over NAV"]).round(5)
 
     diff1 = column.loc[column != ref_col]
     print(diff1)
@@ -1545,8 +1568,8 @@ def test_fill_column_105b(generator, reference_report):
     prod = generator.report.sort_index()
     ref = reference_report.sort_index()
     
-    column = pd.to_numeric(prod["105b_SCR_Mrkt_FX_down weight over NAV"]).round(12)
-    ref_col = pd.to_numeric(ref["105b_SCR_Mrkt_FX_down weight over NAV"]).round(12)
+    column = pd.to_numeric(prod["105b_SCR_Mrkt_FX_down weight over NAV"]).round(5)
+    ref_col = pd.to_numeric(ref["105b_SCR_Mrkt_FX_down weight over NAV"]).round(5)
 
     diff1 = column.loc[column != ref_col]
     print(diff1)

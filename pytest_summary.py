@@ -1,7 +1,7 @@
 import json
 import pytest 
 
-pytest.main(["--report-log=./logs/test_log.json", "--tb=no"]) 
+#pytest.main(["--report-log=./logs/test_log.json", "--tb=no"]) 
 
 report_log = []
 with open("./logs/test_log.json", 'r') as f:
