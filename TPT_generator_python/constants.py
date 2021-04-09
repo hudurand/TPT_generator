@@ -150,7 +150,7 @@ DB_INSTRUMENTS_INFOS_MAP = {
     'identification_code': '14_Identification code of the financial instrument',
     'type_identification_code_for_the_instrument': '15_Type of identification code for the instrument',
     'contract_size_for_derivatives': '20_Contract size for derivatives',
-    'quotation_currency': '21_Quotation currency (A)',
+    #'quotation_currency': '21_Quotation currency (A)', # to report from portfolio
     'interest_rate_type': '32_Interest rate type',
     'coupon_rate': '33_Coupon rate',
     'interest_rate_reference_identification': '34_Interest rate reference identification',

@@ -39,7 +39,7 @@ class TPTFetcher():
                 +'id, '
                 +'code_isin, '
                 +'shareclass, '
-                +'shareclass_id, '
+                #+'shareclass_id, ' might be depecrated
                 +'shareclass_currency, '
                 +'shareclass_name, '
                 +'id_subfund, '

@@ -83,7 +83,8 @@ class DataProcessor():
 
         self.data_bucket.instruments_infos["17_Instrument name"].replace({"Subscription tax IEH": "Subscription tax"}, regex=True, inplace=True)
         self.data_bucket.instruments_infos["17_Instrument name"].replace({"Subscription tax I": "Subscription tax"}, regex=True, inplace=True)
-        self.data_bucket.instruments_infos["21_Quotation currency (A)"].replace({"GBp":"GBP"}, inplace=True)        
+        #self.data_bucket.instruments_infos["21_Quotation currency (A)"].replace({"GBp":"GBP"}, inplace=True)
+        
         self.data_bucket.instruments_infos["55_Covered / not covered"].replace({"n/a" : np.nan}, regex=True, inplace=True)
         self.data_bucket.instruments_infos["93_Sensitivity to underlying asset price (delta)"].replace("-", np.nan, inplace=True)
         self.data_bucket.instruments_infos["90_Modified Duration to maturity date"].replace("-", np.nan, inplace=True)
@@ -95,7 +96,8 @@ class DataProcessor():
 
     def process_instruments_infos(self):
         self.logger.info("processing instruments infos")
-
+        self.data_bucket.instruments_infos[FIELDS["21"]] = self.data_bucket.instruments["asset_currency"]
+        assert not (self.data_bucket.instruments_infos["21_Quotation currency (A)"] == "GBp").any()
         if self.data_bucket.instruments_infos[FIELDS["59"]].isnull().values.any():
             self.compute_59()
         if FIELDS["137"] not in self.data_bucket.instruments_infos.columns:
@@ -167,14 +169,14 @@ class DataProcessor():
                    - distributed.loc[((betas[isin]==1) & (betas["fund"]==0)), isin].sum()) \
                 / (shareclass_keys.loc[betas["fund"]==1].sum(axis=1) \
                    - instruments.loc[betas["fund"]==0, "market_value_fund"].sum())
-
+        breakpoint()
         distributed.index.names = ["instrument"]
         for isin in shareclasses:
             index0 = self.data_bucket.processing_data.loc[(ALL, isin), ALL].index.get_level_values(0)
             assert_index_equal(index0, distributed.index)
             self.data_bucket.processing_data.loc[(ALL, isin), "distribution"] = distributed[isin].values
             self.data_bucket.processing_data.loc[(ALL, isin), "valuation weight"] = \
-                distributed[isin].values / self.data_bucket.get_shareclass_nav(info="shareclass_total_net_asset_sf_ccy")
+                distributed[isin].values / self.data_bucket.get_shareclass_nav(info="shareclass_total_net_asset_sf_ccy", isin=isin)
             self.data_bucket.processing_data.loc[(ALL, isin), "distribution weight"] = \
                 self.data_bucket.processing_data.loc[(ALL, isin), "distribution"] \
                 / self.data_bucket.processing_data.loc[(ALL, isin), "market_value_fund"]
@@ -230,10 +232,7 @@ class DataProcessor():
             "13_Economic zone of the quotation place"] = 0
         sp_instruments_infos.loc[:, 
             "15_Type of identification code for the instrument"] = 99
-        sp_instruments_infos.loc[:, 
-            "21_Quotation currency (A)"].update(
-                instruments.loc[sp_index, "asset_currency"])
-        
+
         sp_instruments_infos.loc[:, "46_Issuer name"] = self.data_bucket.get_fund_infos("depositary_name")
         sp_instruments_infos.loc[:, "47_Issuer identification code"] = self.data_bucket.get_fund_infos("fund_issuer_code")
         sp_instruments_infos.loc[:, "49_Name of the group of the issuer"] = self.data_bucket.get_fund_infos("depositary_group_name")
