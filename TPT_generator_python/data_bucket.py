@@ -21,7 +21,7 @@ class DataBucket():
                  client,
                  source_dir,
                  shareclass_isin=None):
-        # print("Initiliasing Data Bucket.")
+        # print("Initialising Data Bucket.")
         # Config inputs
         # print("Setting configuration.")
         self.logger = logging.getLogger(__name__)
@@ -239,7 +239,7 @@ class DataBucket():
         #TODO: move to processor?
         self.subfund_infos["subfund_indicator"] = \
             self.subfund_infos["subfund_code"].iloc[0].split("_")[1] + "-NH"
-        
+
         if info is None:
             return self.subfund_infos
         else:

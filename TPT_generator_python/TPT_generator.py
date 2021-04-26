@@ -414,6 +414,9 @@ class TPTGenerator():
 
     def fill_column_13(self):
         self.fill_instrument_info(self.fields["13"])
+        self.report[self.fields["13"]].where(
+            self.data_bucket.get_instruments_infos(info=self.fields["12"]).str[2]=="3",
+            inplace=True)
 
     def fill_column_14(self):
         self.report[self.fields["14"]] = self.report.index

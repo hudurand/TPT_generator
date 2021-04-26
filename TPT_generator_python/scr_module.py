@@ -10,7 +10,7 @@ class SCRModule():
         self.data_bucket = data_bucket
         self.cash_flows = CashFlow(self.data_bucket)
         self.define_parameters()
-        self.sym_adj = -0.0
+        self.sym_adj = 3.6
         
         self.Interest_rate_risk_Up = 0
         self.Interest_rate_risk_Down = 0

@@ -169,8 +169,8 @@ class DataProcessor():
                    - distributed.loc[((betas[isin]==1) & (betas["fund"]==0)), isin].sum()) \
                 / (shareclass_keys.loc[betas["fund"]==1].sum(axis=1) \
                    - instruments.loc[betas["fund"]==0, "market_value_fund"].sum())
-        breakpoint()
         distributed.index.names = ["instrument"]
+        
         for isin in shareclasses:
             index0 = self.data_bucket.processing_data.loc[(ALL, isin), ALL].index.get_level_values(0)
             assert_index_equal(index0, distributed.index)
@@ -251,8 +251,8 @@ class DataProcessor():
         self.logger.debug(f"""
         fet instruments infos: {len(fet_index)}
 {sp_instruments_infos.loc[fet_index, ['12_CIC code of the instrument',
-                                       '54_Economic sector',
-                                       '70_Name of the underlying asset']]} 
+                                      '54_Economic sector',
+                                      '70_Name of the underlying asset']]} 
         """)
         self.logger.debug(f"""
         other instruments infos: {len(other_index)}
@@ -353,7 +353,7 @@ class DataProcessor():
 
         ratings = self.data_bucket.get_instruments(['rating_moodys','rating_sp','rating_fitch'])
         ratings = ratings.loc[~(ratings.isnull().all(axis=1))]
-        #breakpoint()
+
         ratings.replace({"u": "",
                  "p": "",
                  " \*\+": "",
@@ -425,11 +425,9 @@ class DataProcessor():
             if row[FIELDS["54"]][0] not in ["K","T"]:
                 return 9
         
-        try:
-            self.data_bucket.instruments_infos[FIELDS["137"]] = \
-                self.data_bucket.instruments_infos.apply(lambda row: select_value(row), axis=1)
-        except:
-            breakpoint()
+        self.data_bucket.instruments_infos[FIELDS["137"]] = \
+            self.data_bucket.instruments_infos.apply(lambda row: select_value(row), axis=1)
+
 
     def compute_market_exposure(self):
         pattern = "..22|..A2|..B4"
